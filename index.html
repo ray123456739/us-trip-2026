@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0E6B46">
+<meta name="robots" content="noindex,nofollow">
+<title>美西公路旅行書</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='10' width='56' height='44' rx='8' fill='%230E6B46' stroke='white' stroke-width='3'/%3E%3Cpath d='M18 40h28M32 22v18m-8-8 8-10 8 10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<!-- 密碼畫面 -->
+<main id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="sign big">SFO → LA → LAS → ANA</div>
+    <h1>美西公路旅行書</h1>
+    <p class="muted">11/20 – 12/05 · 輸入旅行密碼就能一起排行程</p>
+    <form id="gateForm" class="stack" autocomplete="off">
+      <div class="field"><label for="gPass">旅行密碼</label><input id="gPass" type="password" required autocomplete="current-password"></div>
+      <div class="field"><label for="gName">你是誰？（顯示誰加了什麼）</label><input id="gName" type="text" maxlength="20" placeholder="例如：Ray、堂姐"></div>
+      <button class="btn" id="gBtn" type="submit">進入旅行書</button>
+      <p class="err" id="gErr" role="alert"></p>
+    </form>
+  </div>
+</main>
+
+<!-- 主畫面 -->
+<div id="app" class="wrap" hidden>
+  <header class="hero">
+    <div class="eyebrow">11/20 – 12/05 · 16 天 · 自駕一圈</div>
+    <h1>美西公路旅行書</h1>
+    <p class="count" id="count"></p>
+    <div class="route" aria-label="路線">
+      <span class="sign">SFO</span><span class="arr">→</span><span class="sign">LA</span><span class="arr">→</span><span class="sign">LAS</span><span class="arr">→</span><span class="sign">ANAHEIM</span><span class="arr">→</span><span class="sign">SFO</span>
+    </div>
+  </header>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <h2>看到不錯的地方？貼上來</h2>
+    <p class="hint">IG Reels、TikTok、YouTube、Google 地圖、小紅書都可以。不確定哪天就先放「想去清單」。</p>
+    <div class="field">
+      <label for="fUrl">連結</label>
+      <div class="urlbox"><input type="text" id="fUrl" inputmode="url" placeholder="https://www.instagram.com/reel/…"><span class="tag" id="fTag" hidden></span></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label for="fTitle">這是哪裡／做什麼</label><input type="text" id="fTitle" maxlength="200" placeholder="例如：Santa Monica 的早午餐店"></div>
+      <div class="field"><label for="fDay">排到哪天</label><select id="fDay"></select></div>
+    </div>
+    <div class="field"><label for="fNote">備註（選填）</label><input type="text" id="fNote" maxlength="2000" placeholder="例如：要預約、只開到下午 3 點"></div>
+    <div class="photo-pick">
+      <label class="pick" for="fPhoto"><span class="pick-ic" aria-hidden="true">＋</span><span>加照片（Reels 截圖也可以）</span></label>
+      <input type="file" id="fPhoto" accept="image/*" class="sr">
+      <div class="preview" id="fPreview" hidden><img alt="" id="fPreviewImg"><button type="button" class="ic" id="fPhotoClear" aria-label="移除照片">✕</button></div>
+    </div>
+    <div class="actions">
+      <button class="btn" type="submit" id="fBtn">加進行程</button>
+      <span class="hint" id="fMsg" role="status"></span>
+    </div>
+  </form>
+
+  <nav class="nav" id="nav" aria-label="跳到某一天"></nav>
+
+  <section class="sec" id="wish">
+    <div class="sec-head">
+      <div class="sign exit wishsign"><span class="md">想去</span><span class="wd">WISH LIST</span></div>
+      <div class="sec-title"><h3>想去清單</h3><span class="sub">還沒排進哪一天的口袋名單</span></div>
+    </div>
+    <ul class="wishlist" id="list-wish"><li class="empty">正在載入行程…</li></ul>
+  </section>
+
+  <div id="days" class="days"></div>
+
+  <footer class="foot">
+    <span>兩個人看到的是同一份，每 20 秒自動更新。</span>
+    <button class="linkbtn" type="button" id="logout">登出這支手機</button>
+  </footer>
+</div>
+
+<div id="setup" class="gate" hidden><div class="gate-card"><h1>還沒設定好</h1><p class="muted">config.js 裡還沒有填 Supabase 的網址和金鑰。</p></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
