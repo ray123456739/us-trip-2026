@@ -2,5 +2,5 @@
 // 絕對不要把 secret 或 service_role key 放進這個檔案。
 window.TRIP_CONFIG = {
   url: "https://lgfleupvutgohepaejlc.supabase.co",
-  key: ""    // Publishable key（sb_publishable_...）或 anon key（eyJ...）
+  key: "sb_publishable_2p5fe8MvMV8kqhy2-tM3yw_LjluYm6I"
 };
