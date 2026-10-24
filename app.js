@@ -304,11 +304,10 @@ $("#nameBar").addEventListener("submit", ev => {
   me = n; store.set("trip.name", n); $("#nameBar").hidden = true; toast(`嗨 ${n}，之後你加的行程都會標上名字`);
 });
 
-/* 一鍵登入：網址帶 #k=密碼 就自動登入，登入後把密碼從網址拿掉 */
+/* 一鍵登入：網址帶 #k=密碼 就自動登入。密碼留在網址上，加到主畫面的捷徑才帶得到它（iPhone 主畫面跟 Safari 的記憶是分開的） */
 function readLinkKey() {
   const m = location.hash.match(/(?:^#|&)k=([^&]+)/);
   if (!m) return "";
-  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
   try { return decodeURIComponent(m[1]); } catch { return m[1]; }
 }
 
