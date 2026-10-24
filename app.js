@@ -11,6 +11,14 @@ const DAYS = [
   ["2026-12-04","12/04","五","FRI","sf","舊金山"],["2026-12-05","12/05","六","SAT","sf","舊金山"]
 ].map(([key, md, wd, en, city, stay]) => ({ key, md, wd, en, city, stay }));
 const CITY = { sf: "舊金山", la: "洛杉磯", lv: "Las Vegas", ana: "Anaheim" };
+const CITY_EN = { sf: "San Francisco", la: "Los Angeles", lv: "Las Vegas", ana: "Anaheim" };
+const commons = f => ({ src: "https://commons.wikimedia.org/wiki/Special:FilePath/" + encodeURIComponent(f) + "?width=1600", page: "https://commons.wikimedia.org/wiki/File:" + encodeURIComponent(f) });
+const CITY_IMG = {
+  sf: commons("Golden_Gate_Bridge_at_sunset_1.jpg"),
+  la: commons("LA_Skyline_Mountains2.jpg"),
+  lv: commons("Las_Vegas_Strip_from_Resorts_World_February_2023_HDR_1.jpg"),
+  ana: commons("6308-AnaheimDisneyLand-NW_to_SE_View.jpg")
+};
 const SPECIAL = { "2026-11-20": "抵達日", "2026-11-26": "感恩節", "2026-11-27": "Black Friday", "2026-12-05": "回台灣" };
 const DRIVE = {
   "2026-11-21": ["I-5", "舊金山 → 洛杉磯，約 6 小時"],
@@ -92,7 +100,7 @@ function source(url) {
   let u; try { u = new URL(url); } catch { return { k: "", label: "連結" }; }
   const host = u.hostname.replace(/^www\.|^m\./, "");
   if (/instagram\.com$/.test(host)) return { k: "ig", label: /\/reels?\//.test(u.pathname) ? "IG Reel" : "IG" };
-  if (/tiktok\.com$/.test(host)) return { k: "", label: "TikTok" };
+  if (/tiktok\.com$/.test(host)) return { k: "tt", label: "TikTok" };
   if (/youtube\.com$|youtu\.be$/.test(host)) return { k: "yt", label: /shorts/.test(u.pathname) ? "Shorts" : "YouTube" };
   if (/^maps\.app\.goo\.gl$|^goo\.gl$/.test(host) || (/google\./.test(host) && /\/maps/.test(u.pathname))) return { k: "map", label: "地圖" };
   if (/xiaohongshu\.com$|xhslink\.com$/.test(host)) return { k: "xhs", label: "小紅書" };
@@ -151,7 +159,8 @@ function buildShell() {
         h("div", { class: "cover-in" },
           h("div", { class: "sign exit" }, h("span", { class: "md" }, d.md), h("span", { class: "wd" }, `${d.en} · ${d.wd}`)),
           h("div", { class: "cover-txt" }, h("h3", {}, CITY[d.city]), h("span", { class: "sub" }, sub.join(" · ")))),
-        h("button", { class: "cover-btn", type: "button", onclick: () => changeCover(d.key) }, "加封面照")),
+        h("button", { class: "cover-btn", type: "button", onclick: () => changeCover(d.key) }, "換成我們的照片"),
+        h("a", { class: "credit", target: "_blank", rel: "noopener noreferrer" }, "照片：Wikimedia Commons")),
       DRIVE[d.key] ? h("div", { class: "drive" }, h("span", { class: "lane" }, DRIVE[d.key][0]), h("span", {}, "開車日：" + DRIVE[d.key][1])) : null,
       h("ul", { class: "list", id: "list-" + d.key }),
       h("button", { class: "btn ghost sm add-here", type: "button", onclick: () => focusAdd(d.key) }, "＋ 加到這天"));
@@ -167,12 +176,29 @@ function render() {
   fill($("#list-wish"), sorted(""), "還沒有東西。在上面貼一個 Reels 連結試試。", draft);
   for (const d of DAYS) {
     fill($("#list-" + d.key), sorted(d.key), "這天還空著。", draft);
-    const cv = $("#cover-" + d.key), ph = covers[d.key];
-    const old = cv.querySelector("img"); if (old) old.remove();
-    cv.classList.toggle("has-photo", !!ph);
-    if (ph) cv.prepend(h("img", { src: photoUrl(ph), alt: "", loading: "lazy" }));
-    cv.querySelector(".cover-btn").textContent = ph ? "換封面" : "加封面照";
+    renderCover(d);
   }
+}
+/* 封面：自己上傳的照片優先，沒有就用城市預設照片（Wikimedia Commons） */
+function renderCover(d) {
+  const cv = $("#cover-" + d.key), own = covers[d.key];
+  const src = own ? photoUrl(own) : CITY_IMG[d.city].src;
+  let img = cv.querySelector("img.cover-img");
+  if (!img || img.dataset.src !== src) {
+    if (img) img.remove();
+    img = h("img", { class: "cover-img", src, alt: "", loading: "lazy", "data-src": src });
+    img.addEventListener("error", () => { img.remove(); cv.classList.remove("has-photo"); credit.hidden = true; });
+    cv.prepend(img);
+  }
+  cv.classList.add("has-photo");
+  const credit = cv.querySelector(".credit");
+  credit.hidden = !!own; credit.href = CITY_IMG[d.city].page;
+  cv.querySelector(".cover-btn").textContent = own ? "換封面" : "換成我們的照片";
+}
+function mapsUrl(it) {
+  if (it.url && source(it.url).k === "map") return it.url;
+  const d = DAYS.find(x => x.key === it.day);
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([it.title, d ? CITY_EN[d.city] : ""].filter(Boolean).join(" "));
 }
 function fill(ul, list, emptyText, draft) {
   if (!list.length) { ul.replaceChildren(h("li", { class: "empty" }, emptyText)); return; }
@@ -180,18 +206,24 @@ function fill(ul, list, emptyText, draft) {
 }
 function itemEl(it, i, list, draft) {
   const s = source(it.url), link = it.url && isHttp(it.url);
-  const ttl = h("div", { class: "ttl" }, it.time ? h("span", { class: "time" }, it.time) : null,
-    link ? h("a", { href: it.url, target: "_blank", rel: "noopener noreferrer" }, it.title || s.label) : (it.title || "（沒有名稱）"));
-  const meta = h("div", { class: "meta" }, it.added_by ? h("span", {}, `${it.added_by} 加的`) : null,
-    h("a", { href: "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(it.title || ""), target: "_blank", rel: "noopener noreferrer" }, "在地圖找"));
+  const ttl = h("div", { class: "ttl" }, it.time ? h("span", { class: "time" }, it.time) : null, it.title || s.label || "（沒有名稱）");
+  const isVideo = ["ig", "tt", "yt", "xhs"].includes(s.k) || /TikTok|FB|Threads/.test(s.label);
+  const linkLabel = s.k === "map" ? "開啟地圖連結" : isVideo ? `▶ 看 ${s.label}` : "開啟連結";
+  const chips = h("div", { class: "chips" },
+    link && s.k !== "map" ? h("a", { class: "chip chip-link " + s.k, href: it.url, target: "_blank", rel: "noopener noreferrer" }, linkLabel) : null,
+    h("a", { class: "chip chip-map", href: mapsUrl(it), target: "_blank", rel: "noopener noreferrer" }, "📍 Google 地圖"));
+  const meta = it.added_by ? h("div", { class: "meta" }, `${it.added_by} 加的`) : null;
+  /* 側邊縮圖：有照片放照片；只有影片連結時放一個可點的播放圖示 */
+  const thumbInner = it.photo ? h("img", { src: photoUrl(it.photo), alt: "", loading: "lazy" })
+    : link && isVideo ? h("span", { class: "thumb-play " + s.k }, h("span", { class: "play" }, "▶"), h("span", { class: "thumb-lbl" }, s.label)) : null;
+  const thumb = thumbInner ? (link ? h("a", { class: "thumb", href: it.url, target: "_blank", rel: "noopener noreferrer", "aria-label": linkLabel }, thumbInner) : h("div", { class: "thumb" }, thumbInner)) : null;
   const acts = h("div", { class: "acts" },
     h("button", { class: "ic", type: "button", "aria-label": "往上移", disabled: i === 0, onclick: () => swap(list[i], list[i - 1]) }, "↑"),
     h("button", { class: "ic", type: "button", "aria-label": "往下移", disabled: i === list.length - 1, onclick: () => swap(list[i], list[i + 1]) }, "↓"),
     h("button", { class: "ic", type: "button", "aria-label": "編輯", "aria-expanded": openId === it.id ? "true" : "false", onclick: () => { openId = openId === it.id ? null : it.id; confirmId = null; render(); } }, "✎"));
-  const li = h("li", { class: "item" + (it.photo ? " has-photo" : "") },
-    it.photo ? (link ? h("a", { href: it.url, target: "_blank", rel: "noopener noreferrer", "aria-label": it.title || s.label }, h("img", { class: "ph", src: photoUrl(it.photo), alt: "", loading: "lazy" }))
-                     : h("img", { class: "ph", src: photoUrl(it.photo), alt: "", loading: "lazy" })) : null,
-    h("div", { class: "body" }, h("span", { class: "tag " + s.k }, s.label), h("div", { class: "main" }, ttl, it.note ? h("div", { class: "note" }, it.note) : null, meta), acts));
+  const li = h("li", { class: "item" + (thumb ? " has-thumb" : "") + (it.photo ? " has-photo" : "") },
+    h("div", { class: "body" }, thumb,
+      h("div", { class: "main" }, ttl, it.note ? h("div", { class: "note" }, it.note) : null, chips, meta), acts));
   if (openId === it.id) li.append(editEl(it, draft || it));
   return li;
 }

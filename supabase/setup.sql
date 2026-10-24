@@ -117,41 +117,6 @@ drop policy if exists "trip photos upload" on storage.objects;
 create policy "trip photos upload" on storage.objects for insert to anon, authenticated
   with check (bucket_id = 'photos');
 
--- 目前的行程 -----------------------------------------------------------
--- 只在資料表還是空的時候放進去，重跑這份設定不會重複
-insert into items (title, note, day, time, sort, added_by)
-select * from (values
- ('抵達 SFO（BR008）','紅眼班機落地，這天行程待排','2026-11-20','06:40',1001,'Ray'),
- ('從舊金山出發開往 LA','','2026-11-21','07:00',1002,'Ray'),
- ('途中午餐、休息','','2026-11-21','',1003,'Ray'),
- ('晚上輕鬆吃飯','','2026-11-21','晚上',1004,'Ray'),
- ('Beverly Hills','','2026-11-22','',1005,'Ray'),
- ('Rodeo Drive','','2026-11-22','',1006,'Ray'),
- ('West Hollywood','','2026-11-22','',1007,'Ray'),
- ('Griffith Observatory','','2026-11-22','傍晚',1008,'Ray'),
- ('Santa Monica','','2026-11-23','',1009,'Ray'),
- ('Venice Beach','','2026-11-23','',1010,'Ray'),
- ('購物或休息','','2026-11-23','下午',1011,'Ray'),
- ('從 LA 出發開往 Vegas','','2026-11-24','8–9 AM',1012,'Ray'),
- ('入住後逛 Strip','','2026-11-24','晚上',1013,'Ray'),
- ('Bellagio 溫室花園','','2026-11-25','',1014,'Ray'),
- ('Caesars Palace','','2026-11-25','',1015,'Ray'),
- ('Forum Shops','','2026-11-25','',1016,'Ray'),
- ('Sphere','','2026-11-25','晚上',1017,'Ray'),
- ('Thanksgiving Dinner','不要排太滿，吃一頓好的','2026-11-26','',1018,'Ray'),
- ('Bellagio 水舞','','2026-11-26','晚上',1019,'Ray'),
- ('逛 Outlet','跟 Red Rock Canyon 二選一','2026-11-27','',1020,'Ray'),
- ('Red Rock Canyon','跟 Outlet 二選一','2026-11-27','',1021,'Ray'),
- ('離開 Vegas 開往 Anaheim','','2026-11-28','07:00',1022,'Ray'),
- ('入住','','2026-11-28','下午',1023,'Ray'),
- ('Downtown Disney','','2026-11-28','晚上',1024,'Ray'),
- ('Disney California Adventure (DCA)','','2026-11-29','',1025,'Ray'),
- ('Disneyland Park 主園區','這一天是整趟 Disney 的重點','2026-11-30','',1026,'Ray'),
- ('從 Anaheim 出發開回 SF','這天主要就是回程','2026-12-01','08:00',1027,'Ray'),
- ('搭機回台灣（BR007 SFO → TPE）','','2026-12-05','12:00',1028,'Ray')
-) as v(title, note, day, time, sort, added_by)
-where not exists (select 1 from items);
-
 -- 設定旅行密碼（把 改成你們的密碼 換掉，至少 6 個字）---------------------
 insert into trip_secret (id, pass_hash) values (1, crypt('改成你們的密碼', gen_salt('bf')))
 on conflict (id) do update set pass_hash = excluded.pass_hash;
