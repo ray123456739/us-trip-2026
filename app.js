@@ -424,20 +424,27 @@ async function changeCover(day) {
 /* ---------- AI 判斷 ---------- */
 let aiFilled = {}, aiBusy = false;
 function aiShow(kind, ...kids) { const b = $("#fAiBox"); b.className = "aibox " + kind; b.replaceChildren(...kids.filter(k => k != null && k !== "")); b.hidden = false; }
+let aiLastUrl = "", aiTick = null;
 async function aiRun() {
-  if (aiBusy) return;
+  if (aiBusy) { toast("上一個還在判斷中，等它完成再試"); return; }
   const url = cleanUrl($("#fUrl").value), hint = $("#fTitle").value.trim();
   if (!isHttp(url) && !hint) { aiShow("warn", "先貼一個連結，或在「地點名字」寫個名稱，AI 才能判斷。"); return; }
-  aiBusy = true; $("#fAi").disabled = true; aiShow("", "✨ AI 正在看這個連結，大約 5 秒…");
+  aiLastUrl = url;
+  aiBusy = true; $("#fAi").disabled = true; $("#fAi").textContent = "✨ 判斷中…";
+  /* 顯示經過秒數，讓人知道它還在跑；超過 90 秒就放棄，按鈕不會一直卡住 */
+  const t0 = Date.now(), ctrl = new AbortController(), killer = setTimeout(() => ctrl.abort(), 90000);
+  const tick = () => aiShow("", `✨ AI 正在看${isHttp(url) ? "這支影片" : "這個地點"}，已經 ${Math.round((Date.now() - t0) / 1000)} 秒（通常 10–30 秒）…`);
+  tick(); aiTick = setInterval(tick, 1000);
   try {
     const r = await fetch(`${BASE}/functions/v1/analyze`, { method: "POST", headers: headers({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ p: pass, url: isHttp(url) ? url : "", hint }) });
+      body: JSON.stringify({ p: pass, url: isHttp(url) ? url : "", hint }), signal: ctrl.signal });
+    clearInterval(aiTick);
     const j = await r.json().catch(() => ({}));
     if (r.status === 401 || j.error === "bad_passcode") { onErr({ code: "28P01", message: "bad_passcode" }); return; }
     if (j.error === "no_api_key") { aiShow("warn", "AI 還沒設定好（Supabase 裡還沒放 API 金鑰），先自己選日期吧。"); return; }
     if (j.error === "nothing_to_read") { aiShow("warn", "IG 擋住了，讀不到這支影片的文字說明。在「地點名字」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
     if (j.error === "not_identified") { aiShow("warn", "AI 看不出這是哪裡。在「地點名字」寫得更具體一點（例如英文店名或所在區域），再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
-    if (!j.ok) { aiShow("warn", "AI 暫時沒回應，可以稍後再試，或自己選日期。"); return; }
+    if (!j.ok) { aiShow("warn", "AI 這次沒有成功，按 ✨ AI 判斷並排進行程 再試一次；還是不行的話跟 Ray 說。"); return; }
     /* 直接排進行程：一支影片可能有好幾個地點，每個各存一筆。只有一個地點時，你自己填的時間、停留、備註、筆記會保留 */
     const places = j.places || [], skipped = j.skipped || [];
     const mine = k => $(k).value.trim();
@@ -476,8 +483,11 @@ async function aiRun() {
         h("button", { class: "btn ghost sm", type: "button", onclick: () => run(async () => {
           for (const x of saved) await rpc("trip_delete", { p: pass, item_id: x.id });
           $("#fAiBox").hidden = true; toast(saved.length > 1 ? `已復原，${saved.length} 個地點都拿掉了` : "已復原，沒有加進行程"); }) }, saved.length > 1 ? "全部復原" : "復原")) : null);
-  } catch { aiShow("warn", "連不上 AI，請確認網路後再試。"); }
-  finally { aiBusy = false; $("#fAi").disabled = false; }
+  } catch (e) {
+    clearInterval(aiTick);
+    aiShow("warn", e && e.name === "AbortError" ? "AI 太久沒回應了。按 ✨ AI 判斷並排進行程 再試一次。" : "連不上 AI，請確認網路後再按 ✨ 再試一次。");
+  }
+  finally { clearInterval(aiTick); clearTimeout(killer); if (cleanUrl($("#fUrl").value) === aiLastUrl) aiLastUrl = ""; aiBusy = false; $("#fAi").disabled = false; $("#fAi").textContent = "✨ AI 判斷並排進行程"; }
 }
 
 /* ---------- 新增表單 ---------- */
@@ -486,7 +496,17 @@ function initForm() {
   const fUrl = $("#fUrl"), fTag = $("#fTag");
   const updTag = () => { const u = cleanUrl(fUrl.value); if (u && isHttp(u)) { const s = source(u); fTag.textContent = s.label; fTag.className = "tag " + s.k; fTag.hidden = false; } else fTag.hidden = true; };
   fUrl.addEventListener("input", updTag);
-  fUrl.addEventListener("paste", () => setTimeout(() => { fUrl.value = cleanUrl(fUrl.value); updTag(); if (isHttp(fUrl.value)) aiRun(); else $("#fTitle").focus(); }, 0));
+  /* 不管是貼上、鍵盤建議還是自己打，只要欄位裡出現一個新的網址就自動判斷 */
+  let urlTimer = null;
+  const autoRun = () => { clearTimeout(urlTimer); urlTimer = setTimeout(() => {
+    const u = cleanUrl(fUrl.value);
+    if (u !== fUrl.value.trim() && isHttp(u)) fUrl.value = u;
+    updTag();
+    if (isHttp(u) && u !== aiLastUrl && !aiBusy) aiRun();
+  }, 700); };
+  fUrl.addEventListener("input", autoRun);
+  fUrl.addEventListener("paste", () => setTimeout(autoRun, 0));
+  fUrl.addEventListener("change", autoRun);
   $("#fAi").addEventListener("click", aiRun);
   $("#fTitle").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); aiRun(); } });
   const clearPhoto = () => { pendingPhoto = null; $("#fPhoto").value = ""; $("#fPreview").hidden = true; const im = $("#fPreviewImg"); if (im.src) URL.revokeObjectURL(im.src); im.removeAttribute("src"); };

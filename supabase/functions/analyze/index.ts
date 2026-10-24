@@ -104,23 +104,35 @@ ${linkText || "（讀不到）"}
 - 同一天裡的時段不能重疊：每個地點給明確開始時間（例如 10:00、13:30），要接在當天已排行程和你這次排的前一個地點結束之後，並留移動時間。看地點類型挑合理時段：早午餐和咖啡店在早上、博物館白天、夕陽景點在傍晚（11 月底約 16:45 日落）、夜景和秀在晚上。
 - 不同區域的地點不要硬塞同一天，例如 Getty Center（西區山上）和 Downtown 的地點；Getty Center 和 Getty Villa 是兩個不同地方、各要 2 小時以上，不要排在同一個早上。
 - 地點不在這趟會去的區域（例如亞利桑那州），還是列進 places，但 day 留空字串，note 說明不在路線上。
-- 不要編造店名；連結文字沒寫清楚的就不要列。
+- 連結文字裡沒提到的店名不要自己編。但如果使用者是用描述在找地點（例如「聖塔莫尼卡那家很紅的潛艇堡」「Vegas 那個大摩天輪」），請依常識找出最可能的知名地點列進 places，confidence 給 medium 或 low，note 寫出你猜的依據。
 
-不管判斷得出來與否，都只輸出一個 JSON，開頭是 { 結尾是 }，不要加任何說明文字或 markdown：
-{"places":[{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"開始時間，例如 10:00、13:30；放想去清單的就空字串","stay":"建議停留多久，例如 1 小時","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內"}],"skipped":[{"place":"地點名稱","reason":"為什麼沒加"}],"confidence":"high、medium 或 low"}`;
+依照指定的 JSON 格式回答。找不到地點就回空的 places，並在 skipped 說明原因。`;
 
+  // 結構化輸出：AI 的回答保證符合這份欄位規格，不會再出現格式壞掉、讀不懂的情況
+  const PLACE = { type: "object", additionalProperties: false, required: ["place", "area", "day", "time", "stay", "note"], properties: {
+    place: { type: "string", description: "地點正式名稱（英文為主，可加中文）" },
+    area: { type: "string", description: "所在區域，例如 Santa Monica" },
+    day: { type: "string", description: "YYYY-MM-DD，放想去清單就給空字串", enum: ["", ...DAYS.map(d => d[0])] },
+    time: { type: "string", description: "開始時間，例如 10:00、13:30；放想去清單就空字串" },
+    stay: { type: "string", description: "建議停留多久，例如 1 小時" },
+    note: { type: "string", description: "一句繁體中文，說明這是什麼和為什麼排這天，30 字內" } } };
+  const SCHEMA = { type: "object", additionalProperties: false, required: ["places", "skipped", "confidence"], properties: {
+    places: { type: "array", items: PLACE },
+    skipped: { type: "array", items: { type: "object", additionalProperties: false, required: ["place", "reason"],
+      properties: { place: { type: "string" }, reason: { type: "string" } } } },
+    confidence: { type: "string", enum: ["high", "medium", "low"] } } };
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 16000, output_config: { effort: "medium" }, messages: [{ role: "user", content: prompt }] }) });
+    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 16000,
+      output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
+      messages: [{ role: "user", content: prompt }] }) });
   if (!ar.ok) { console.error("anthropic", ar.status, await ar.text()); return json({ error: "ai_failed", status: ar.status }, 502); }
   const out = await ar.json();
-  const text = (out.content || []).map((c: { text?: string }) => c.text || "").join("");
-  console.log("ai raw", out.stop_reason, text.slice(0, 500).replace(/\n/g, " / "));
-  const cleaned = text.replace(/```(?:json)?/gi, "");
-  const m = cleaned.match(/\{[\s\S]*\}/);
+  const textBlock = (out.content || []).find((c: { type: string }) => c.type === "text");
   // deno-lint-ignore no-explicit-any
   let r: any = null;
-  if (m) { try { r = JSON.parse(m[0]); } catch { /* 下面處理 */ } }
+  try { r = textBlock ? JSON.parse(textBlock.text) : null; } catch { r = null; }
+  console.log("ai result", out.stop_reason, JSON.stringify(r).slice(0, 800));
   if (!r) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
   const valid = new Set(DAYS.map(d => d[0]));
   const str = (v: unknown, n: number) => (typeof v === "string" ? v : "").slice(0, n);
@@ -128,11 +140,35 @@ ${linkText || "（讀不到）"}
     .map((x: Record<string, unknown>) => ({ place: str(x.place, 200), area: str(x.area, 100), day: valid.has(str(x.day, 10)) ? str(x.day, 10) : "",
       time: str(x.time, 40), stay: str(x.stay, 40), note: str(x.note, 300) }))
     .filter((x: { place: string }) => x.place);
+  // 伺服器自己再檢查一次：同一個地點只留一筆；行程裡已經有的移到「沒有加的」
+  const norm = (t: string) => t.toLowerCase().replace(/[（(].*?[)）]/g, "").replace(/[^a-z0-9\u3400-\u9fff]/g, "");
+  const flat = (t: string) => t.toLowerCase().replace(/[^a-z0-9\u3400-\u9fff]/g, "");
+  const existing = (trip.items || []).map((i: { title: string }) => flat(i.title || "")).filter((t: string) => t.length >= 4);
+  const seen = new Set<string>(), extraSkipped: { place: string; reason: string }[] = [];
+  const kept = places.filter((x: { place: string }) => {
+    const k = norm(x.place); if (!k) return false;
+    if (seen.has(k)) return false; seen.add(k);
+    if (k.length >= 5 && existing.some((e: string) => e.includes(k))) { extraSkipped.push({ place: x.place, reason: "行程裡已經有了" }); return false; }
+    return true;
+  });
+  places.length = 0; places.push(...kept);
+  // 每日上限：一天最多 6 個景點（不算開車、入住、搭機這類），超過的放進想去清單
+  const MAX_PER_DAY = 6;
+  const isTransit = (t: string) => /出發|開往|開回|抵達|搭機|入住|回程|休息/.test(t || "");
+  const load: Record<string, number> = {};
+  for (const it of trip.items || []) if (it.day && !isTransit(it.title)) load[it.day] = (load[it.day] || 0) + 1;
+  for (const x of places) {
+    if (!x.day) continue;
+    if ((load[x.day] || 0) >= MAX_PER_DAY) {
+      x.note = `${x.day.slice(5).replace("-", "/")} 已經排了 ${load[x.day]} 個景點，先放想去清單`; x.day = ""; x.time = "";
+    } else load[x.day] = (load[x.day] || 0) + 1;
+  }
   const skipped = (Array.isArray(r.skipped) ? r.skipped : []).slice(0, 10)
     .map((x: Record<string, unknown>) => ({ place: str(x.place, 200), reason: str(x.reason, 100) })).filter((x: { place: string }) => x.place);
+  skipped.push(...extraSkipped);
   if (!places.length && !skipped.length) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
   const f = places[0] || { place: "", area: "", day: "", time: "", stay: "", note: "" };
   // 舊版網頁只看得懂單一地點，附上第一個地點的欄位，避免存成空項目
-  return json({ ok: true, read_link: !!linkText, places, skipped, confidence: str(r.confidence, 10) || "low",
+  return json({ ok: true, read_link: !!linkText, places, skipped, confidence: str(r.confidence, 10).toLowerCase() || "low",
     place: f.place, area: f.area, day: f.day, time: f.time, stay: f.stay, note: f.note });
 });
