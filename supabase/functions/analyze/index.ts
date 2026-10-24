@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
   // 3. 整理每天已經排的行程
   const byDay: Record<string, string[]> = {};
-  for (const it of trip.items || []) if (it.day) (byDay[it.day] ||= []).push(`${it.time ? it.time + " " : ""}${it.title}`);
+  for (const it of trip.items || []) if (it.day) (byDay[it.day] ||= []).push(`${it.time ? it.time + " " : ""}${it.title}${it.stay ? "（停留 " + it.stay + "）" : ""}`);
   const schedule = DAYS.map(([d, wd, c, note]) =>
     `${d}（${wd}）住${CITY[c]}${note ? "；" + note : ""}；已排：${(byDay[d] || []).join("、") || "（空）"}`).join("\n");
 
@@ -93,12 +93,12 @@ ${linkText || "（讀不到）"}
 規則：
 - 只能排在「住的城市」跟地點相符的日子。Santa Monica、Hollywood、Beverly Hills 等算洛杉磯；Irvine、Huntington Beach、Newport 等橘郡地點算 Anaheim；Red Rock、Hoover Dam 算 Las Vegas；Napa、Muir Woods、Sausalito、Monterey 可排在 12/02–12/04 舊金山的空白日。
 - 開車日只在地點剛好在路上時才排（例如 Barstow Outlet、Harris Ranch、Pismo Beach），否則避開。11/29、11/30 整天在迪士尼，除非是迪士尼裡面或 Downtown Disney 的東西，否則避開。
-- 優先選同城市裡行程比較少的那天；看地點類型決定時段（早午餐→早上、夕陽景點→傍晚、夜景秀和酒吧→晚上）。
+- 優先選同城市裡行程比較少的那天；看地點類型決定時段（早午餐→早上、夕陽景點→傍晚、夜景秀和酒吧→晚上），時段要排在當天已排行程的空檔，不要撞時間。
 - 如果判斷不出地點，或地點不在這趟會去的區域，day 留空字串。
 - 不要編造店名；連結文字沒寫清楚就照實說不確定。
 
 只輸出一個 JSON，不要其他文字：
-{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域或城市，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"早上／中午／下午／傍晚／晚上，或明確時間如 19:30，不確定就空字串","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內","confidence":"high、medium 或 low"}`;
+{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域或城市，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"早上／中午／下午／傍晚／晚上，或明確時間如 19:30，不確定就空字串","stay":"建議停留多久，例如 1 小時、2–3 小時、半天","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內","confidence":"high、medium 或 low"}`;
 
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
@@ -112,5 +112,5 @@ ${linkText || "（讀不到）"}
   try { r = JSON.parse(m[0]); } catch { return json({ error: "ai_unclear" }, 200); }
   if (r.day && !DAYS.some(d => d[0] === r.day)) r.day = "";
   return json({ ok: true, read_link: !!linkText, place: r.place || "", area: r.area || "", day: r.day || "",
-    time: r.time || "", note: r.note || "", confidence: r.confidence || "low" });
+    time: r.time || "", stay: r.stay || "", note: r.note || "", confidence: r.confidence || "low" });
 });

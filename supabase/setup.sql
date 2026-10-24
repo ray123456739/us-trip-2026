@@ -16,6 +16,7 @@ create table if not exists public.items (
   note text not null default '',
   day text not null default '',          -- 'YYYY-MM-DD'，空字串 = 想去清單
   time text not null default '',
+  stay text not null default '',         -- 預計停留多久
   sort double precision not null default 0,
   photo text not null default '',        -- storage 裡的檔名
   added_by text not null default '',
@@ -74,15 +75,16 @@ begin
       note     = coalesce(it->>'note', note),
       day      = coalesce(it->>'day', day),
       time     = coalesce(it->>'time', time),
+      stay     = coalesce(left(it->>'stay', 40), stay),
       sort     = coalesce((it->>'sort')::double precision, sort),
       photo    = coalesce(it->>'photo', photo),
       updated_at = now()
     where id = (it->>'id')::uuid
     returning * into r;
   else
-    insert into items (title, url, note, day, time, sort, photo, added_by)
+    insert into items (title, url, note, day, time, stay, sort, photo, added_by)
     values (left(coalesce(it->>'title',''),200), left(coalesce(it->>'url',''),1000), left(coalesce(it->>'note',''),2000),
-            coalesce(it->>'day',''), left(coalesce(it->>'time',''),40),
+            coalesce(it->>'day',''), left(coalesce(it->>'time',''),40), left(coalesce(it->>'stay',''),40),
             coalesce((it->>'sort')::double precision, extract(epoch from now())*1000),
             coalesce(it->>'photo',''), left(coalesce(it->>'added_by',''),40))
     returning * into r;

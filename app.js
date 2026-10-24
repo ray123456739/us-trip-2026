@@ -172,10 +172,10 @@ function sorted(day) { return items.filter(i => (i.day || "") === day).sort((a, 
 function render() {
   if (!loaded) return;
   let draft = null; const ed = document.querySelector(".edit[data-id]");
-  if (ed) draft = { id: ed.dataset.id, title: ed.querySelector(".eTitle").value, url: ed.querySelector(".eUrl").value, time: ed.querySelector(".eTime").value, note: ed.querySelector(".eNote").value, day: ed.querySelector(".eDay").value };
+  if (ed) draft = { id: ed.dataset.id, title: ed.querySelector(".eTitle").value, url: ed.querySelector(".eUrl").value, time: ed.querySelector(".eTime").value, stay: ed.querySelector(".eStay").value, note: ed.querySelector(".eNote").value, day: ed.querySelector(".eDay").value };
   fill($("#list-wish"), sorted(""), "還沒有東西。在上面貼一個 Reels 連結試試。", draft);
   for (const d of DAYS) {
-    fill($("#list-" + d.key), sorted(d.key), "這天還空著。", draft);
+    fill($("#list-" + d.key), sorted(d.key), "這天還空著。", draft, true);
     renderCover(d);
   }
 }
@@ -195,14 +195,32 @@ function renderCover(d) {
   credit.hidden = !!own; credit.href = CITY_IMG[d.city].page;
   cv.querySelector(".cover-btn").textContent = own ? "換封面" : "換成我們的照片";
 }
+function placeQuery(it) {
+  const d = DAYS.find(x => x.key === it.day);
+  const city = d ? CITY_EN[d.city] : "";
+  const t = it.title || "";
+  return t.toLowerCase().includes(city.toLowerCase()) ? t : [t, city].filter(Boolean).join(" ");
+}
 function mapsUrl(it) {
   if (it.url && source(it.url).k === "map") return it.url;
-  const d = DAYS.find(x => x.key === it.day);
-  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([it.title, d ? CITY_EN[d.city] : ""].filter(Boolean).join(" "));
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(placeQuery(it));
 }
-function fill(ul, list, emptyText, draft) {
+/* 交通行程（開車、出發、入住、搭機這類）不算景點，不幫它算路線 */
+const isTransit = it => /出發|開往|開回|抵達|搭機|入住|回程|休息/.test(it.title || "");
+function legEl(a, b) {
+  const href = "https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=" + encodeURIComponent(placeQuery(a)) + "&destination=" + encodeURIComponent(placeQuery(b));
+  return h("li", { class: "leg" }, h("a", { href, target: "_blank", rel: "noopener noreferrer" },
+    h("span", { class: "leg-ic", "aria-hidden": "true" }, "🚗"), h("span", {}, "到下一站的交通時間"), h("span", { class: "leg-go" }, "Google 地圖 ›")));
+}
+function fill(ul, list, emptyText, draft, legs) {
   if (!list.length) { ul.replaceChildren(h("li", { class: "empty" }, emptyText)); return; }
-  ul.replaceChildren(...list.map((it, i) => itemEl(it, i, list, draft && draft.id === it.id ? draft : null)));
+  const out = [];
+  list.forEach((it, i) => {
+    out.push(itemEl(it, i, list, draft && draft.id === it.id ? draft : null));
+    const nx = list[i + 1];
+    if (legs && nx && !isTransit(it) && !isTransit(nx)) out.push(legEl(it, nx));
+  });
+  ul.replaceChildren(...out);
 }
 function itemEl(it, i, list, draft) {
   const s = source(it.url), link = it.url && isHttp(it.url);
@@ -211,7 +229,8 @@ function itemEl(it, i, list, draft) {
   const linkLabel = s.k === "map" ? "開啟地圖連結" : isVideo ? `▶ 看 ${s.label}` : "開啟連結";
   const chips = h("div", { class: "chips" },
     link && s.k !== "map" ? h("a", { class: "chip chip-link " + s.k, href: it.url, target: "_blank", rel: "noopener noreferrer" }, linkLabel) : null,
-    h("a", { class: "chip chip-map", href: mapsUrl(it), target: "_blank", rel: "noopener noreferrer" }, "📍 Google 地圖"));
+    h("a", { class: "chip chip-map", href: mapsUrl(it), target: "_blank", rel: "noopener noreferrer" }, "📍 Google 地圖"),
+    it.stay ? h("span", { class: "chip chip-stay" }, "⏱ 停留 " + it.stay) : null);
   const meta = it.added_by ? h("div", { class: "meta" }, `${it.added_by} 加的`) : null;
   /* 側邊縮圖：有照片放照片；只有影片連結時放一個可點的播放圖示 */
   const thumbInner = it.photo ? h("img", { src: photoUrl(it.photo), alt: "", loading: "lazy" })
@@ -234,6 +253,7 @@ function editEl(it, v) {
     h("div", { class: "row2" },
       h("div", { class: "field" }, h("label", { for: "eTitle-" + id }, "名稱"), h("input", { type: "text", class: "eTitle", id: "eTitle-" + id, value: v.title || "", maxlength: "200" })),
       h("div", { class: "field" }, h("label", { for: "eTime-" + id }, "時間（選填）"), h("input", { type: "text", class: "eTime", id: "eTime-" + id, value: v.time || "", placeholder: "例如 18:00、傍晚", maxlength: "40" }))),
+    h("div", { class: "field" }, h("label", { for: "eStay-" + id }, "預計停留多久（選填）"), h("input", { type: "text", class: "eStay", id: "eStay-" + id, value: v.stay || "", placeholder: "例如 1 小時、半天", maxlength: "40" })),
     h("div", { class: "field" }, h("label", { for: "eUrl-" + id }, "連結"), h("input", { type: "text", class: "eUrl", id: "eUrl-" + id, value: v.url || "", inputmode: "url" })),
     h("div", { class: "field" }, h("label", { for: "eNote-" + id }, "備註"), h("textarea", { class: "eNote", id: "eNote-" + id, rows: "2", maxlength: "2000" }, v.note || "")),
     h("div", { class: "field" }, h("label", { for: "eDay-" + id }, "排到哪天"), sel),
@@ -264,7 +284,7 @@ function swap(a, b) {
 function saveEdit(it, e) {
   const url = cleanUrl(e.querySelector(".eUrl").value), day = e.querySelector(".eDay").value;
   const patch = { id: it.id, title: e.querySelector(".eTitle").value.trim() || source(url).label, url,
-    time: e.querySelector(".eTime").value.trim(), note: e.querySelector(".eNote").value.trim(), day };
+    time: e.querySelector(".eTime").value.trim(), stay: e.querySelector(".eStay").value.trim(), note: e.querySelector(".eNote").value.trim(), day };
   if (day !== (it.day || "")) patch.sort = Date.now();
   run(async () => { await rpc("trip_save", { p: pass, it: patch }); openId = null; toast(day !== (it.day || "") ? "已移到" + dayLabel(day) : "已儲存"); });
 }
@@ -295,17 +315,29 @@ async function aiRun() {
     if (j.error === "no_api_key") { aiShow("warn", "AI 還沒設定好（Supabase 裡還沒放 API 金鑰），先自己選日期吧。"); return; }
     if (j.error === "nothing_to_read") { aiShow("warn", "讀不到這支影片的文字說明。在「這是哪裡」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); return; }
     if (!j.ok) { aiShow("warn", "AI 暫時沒回應，可以稍後再試，或自己選日期。"); return; }
-    const t = $("#fTitle"), tm = $("#fTime"), nt = $("#fNote");
+    /* 直接排進行程：AI 的判斷優先，你自己有填的時間、停留、備註會保留 */
     const place = [j.place, j.area && !String(j.place).includes(j.area) ? j.area : ""].filter(Boolean).join("，");
-    if (place && (!t.value.trim() || t.value === aiFilled.title)) { t.value = place; aiFilled.title = place; }
-    if (j.time && (!tm.value.trim() || tm.value === aiFilled.time)) { tm.value = j.time; aiFilled.time = j.time; }
-    if (j.note && (!nt.value.trim() || nt.value === aiFilled.note)) { nt.value = j.note; aiFilled.note = j.note; }
-    $("#fDay").value = j.day || "";
-    const where = j.day ? `建議排 ${dayLabel(j.day)}${j.time ? " " + j.time : ""}` : "沒找到適合的日子，先放想去清單";
+    const mine = k => $(k).value.trim();
+    aiShow("", "✨ 判斷好了，正在排進行程…");
+    const photo = pendingPhoto ? await uploadPhoto(pendingPhoto) : "";
+    const saved = await rpc("trip_save", { p: pass, it: {
+      title: place || hint || source(url).label + " 收藏", url: isHttp(url) ? url : "",
+      note: mine("#fNote") || j.note || "", day: j.day || "", time: mine("#fTime") || j.time || "",
+      stay: mine("#fStay") || j.stay || "", sort: Date.now(), photo, added_by: me } });
+    ["#fUrl", "#fTitle", "#fNote", "#fTime", "#fStay"].forEach(k => $(k).value = "");
+    $("#fUrl").dispatchEvent(new Event("input")); $("#fPhotoClear").click(); $("#fDay").value = "";
+    await refresh(); render();
+    const where = j.day ? `排進 ${dayLabel(j.day)}${j.time ? " " + j.time : ""}` : "沒找到適合的日子，先放進想去清單";
+    const go = () => { const el = document.getElementById(j.day ? "d" + j.day.replaceAll("-", "") : "wish"); if (el) el.scrollIntoView({ block: "start" }); };
     aiShow(j.confidence === "low" ? "warn" : "ok",
-      h("b", {}, `📍 ${place || "不太確定是哪裡"}`), h("br"), where + "。",
-      j.confidence === "low" ? " AI 不太確定，請再確認一下。" : "",
-      h("br"), h("span", { class: "muted" }, j.read_link ? "已經幫你填好，可以自己改，按「加進行程」才會存。" : "讀不到影片文字，是用你填的名稱判斷的。可以自己改，按「加進行程」才會存。"));
+      h("b", {}, `📍 ${place || "不太確定是哪裡"}`), h("br"),
+      `已${where}${j.stay ? "，建議停留 " + j.stay : ""}。`,
+      j.confidence === "low" ? " AI 不太確定，記得確認一下。" : "",
+      !j.read_link ? h("span", { class: "muted" }, " 讀不到影片文字，是用你填的名稱判斷的。") : "",
+      h("div", { class: "aibtns" },
+        h("button", { class: "btn sm", type: "button", onclick: go }, "去看看"),
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => run(async () => {
+          await rpc("trip_delete", { p: pass, item_id: saved.id }); $("#fAiBox").hidden = true; toast("已復原，沒有加進行程"); }) }, "復原")));
   } catch { aiShow("warn", "連不上 AI，請確認網路後再試。"); }
   finally { aiBusy = false; $("#fAi").disabled = false; }
 }
@@ -328,8 +360,8 @@ function initForm() {
     $("#fMsg").textContent = pendingPhoto ? "照片上傳中…" : ""; $("#fBtn").disabled = true;
     run(async () => {
       const photo = pendingPhoto ? await uploadPhoto(pendingPhoto) : "";
-      await rpc("trip_save", { p: pass, it: { title: title || source(url).label + " 收藏", url, note, day, time: $("#fTime").value.trim(), sort: Date.now(), photo, added_by: me } });
-      fUrl.value = ""; $("#fTitle").value = ""; $("#fNote").value = ""; $("#fTime").value = ""; $("#fAiBox").hidden = true; aiFilled = {}; updTag(); clearPhoto();
+      await rpc("trip_save", { p: pass, it: { title: title || source(url).label + " 收藏", url, note, day, time: $("#fTime").value.trim(), stay: $("#fStay").value.trim(), sort: Date.now(), photo, added_by: me } });
+      fUrl.value = ""; $("#fTitle").value = ""; $("#fNote").value = ""; $("#fTime").value = ""; $("#fStay").value = ""; $("#fAiBox").hidden = true; aiFilled = {}; updTag(); clearPhoto();
       toast("已加到" + dayLabel(day));
     }).finally(() => { $("#fBtn").disabled = false; $("#fMsg").textContent = ""; });
   });
