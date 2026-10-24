@@ -28,9 +28,48 @@ type Item = { id: string; title: string; day: string; sort: number; lat: number 
 
 function query(it: Item) {
   const city = CITY_EN[DAY_CITY[it.day]] || "";
-  // 去掉括號裡的中文說明和「的早午餐」這類描述，留下地名
-  const t = (it.title || "").replace(/[（(].*?[)）]/g, " ").replace(/[，,]/g, " ").trim();
+  // 去掉括號裡的說明和中文字（地圖資料庫用英文名比較找得到），留下地名
+  let t = (it.title || "").replace(/[（(].*?[)）]/g, " ").replace(/[，,、]/g, " ");
+  const en = t.replace(/[\u3000-\u9fff\uff00-\uffef]+/g, " ").replace(/\s+/g, " ").trim();
+  t = en.length >= 3 ? en : t.trim();
   return t.toLowerCase().includes(city.toLowerCase()) ? t : `${t} ${city}`.trim();
+}
+const CENTER: Record<string, [number, number]> = { sf: [37.77, -122.42], la: [34.05, -118.30], lv: [36.13, -115.17], ana: [33.81, -117.92] };
+const inBox = (city: string, lat: number, lng: number) => {
+  const b = BOX[city]; if (!b) return true;
+  const [w, n, e, s] = b.split(",").map(Number); return lng >= w && lng <= e && lat <= n && lat >= s;
+};
+// 1. Photon（OpenStreetMap 資料，對雲端伺服器比較寬鬆）
+async function photon(q: string, city: string, wide: boolean) {
+  const u = new URL("https://photon.komoot.io/api/");
+  u.searchParams.set("q", q); u.searchParams.set("limit", "3");
+  if (CENTER[city]) { u.searchParams.set("lat", String(CENTER[city][0])); u.searchParams.set("lon", String(CENTER[city][1])); }
+  try {
+    const r = await fetch(u, { headers: { "User-Agent": UA } });
+    console.log("photon", r.status, q);
+    if (!r.ok) return null;
+    const j = await r.json();
+    for (const f of j.features || []) {
+      const [lng, lat] = f.geometry.coordinates;
+      if (wide || inBox(city, lat, lng)) return { lat, lng };
+    }
+    return null;
+  } catch (e) { console.log("photon error", String(e)); return null; }
+}
+// 3. 最後請 AI 給大概的座標（知名景點很準，小店可能有誤差）
+async function aiGeo(title: string, city: string) {
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY"); if (!apiKey) return null;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
+      headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 80, messages: [{ role: "user", content:
+        `"${title}" 這個地點在 ${CITY_EN[city] || "美國"} 附近，它的經緯度是多少？如果這不是一個具體地點（例如「吃晚餐」「逛 Outlet」）或你不確定，回答 none。只回答「緯度,經度」或 none，不要其他文字。` }] }) });
+    const j = await r.json();
+    const t = (j.content || []).map((c: { text?: string }) => c.text || "").join("").trim();
+    console.log("aiGeo", r.status, title, t);
+    const m = t.match(/(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/);
+    return m ? { lat: +m[1], lng: +m[2] } : null;
+  } catch (e) { console.log("aiGeo error", String(e)); return null; }
 }
 
 let lastGeo = 0;
@@ -43,21 +82,32 @@ async function geocode(q: string, city: string, wide: boolean) {
   if (!wide && BOX[city]) { u.searchParams.set("viewbox", BOX[city]); u.searchParams.set("bounded", "1"); }
   try {
     const r = await fetch(u, { headers: { "User-Agent": UA, "Accept-Language": "en" } });
+    console.log("nominatim", r.status, q);
     if (!r.ok) return null;
     const a = await r.json();
     return a && a[0] ? { lat: +a[0].lat, lng: +a[0].lon } : null;
-  } catch { return null; }
+  } catch (e) { console.log("nominatim error", String(e)); return null; }
 }
 
 async function route(a: Item, b: Item) {
   try {
     const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=false`,
       { headers: { "User-Agent": UA } });
+    console.log("osrm", r.status);
     if (!r.ok) return null;
     const j = await r.json();
     const rt = j.routes && j.routes[0];
     return rt ? { min: Math.max(1, Math.round(rt.duration / 60)), km: Math.round(rt.distance / 100) / 10 } : null;
   } catch { return null; }
+}
+
+// OSRM 也連不上時，用直線距離粗估（市區道路約直線的 1.4 倍、平均時速 35 公里）
+function estimate(a: Item, b: Item) {
+  const R = 6371, toR = (x: number) => x * Math.PI / 180;
+  const dLat = toR(b.lat! - a.lat!), dLng = toR(b.lng! - a.lng!);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toR(a.lat!)) * Math.cos(toR(b.lat!)) * Math.sin(dLng / 2) ** 2;
+  const km = 2 * R * Math.asin(Math.sqrt(h)) * 1.4;
+  return { min: Math.max(3, Math.round(km / 35 * 60)), km: Math.round(km * 10) / 10, rough: true };
 }
 
 Deno.serve(async (req) => {
@@ -87,8 +137,10 @@ Deno.serve(async (req) => {
   for (const it of need.values()) {
     const q = query(it);
     if (it.geo_q === q && (it.lat != null || it.geo_fail)) continue;  // 已經查過
-    let g = await geocode(q, city, DRIVE_DAYS.has(day));
-    if (!g && !DRIVE_DAYS.has(day)) g = await geocode(q, city, true);
+    const wide = DRIVE_DAYS.has(day);
+    let g = await photon(q, city, wide);
+    if (!g) g = await geocode(q, city, wide);
+    if (!g) g = await aiGeo(it.title, city);
     it.lat = g ? g.lat : null; it.lng = g ? g.lng : null; it.geo_q = q; it.geo_fail = !g;
     await fetch(`${base}/rest/v1/items?id=eq.${it.id}`, { method: "PATCH", headers: hd,
       body: JSON.stringify({ lat: it.lat, lng: it.lng, geo_q: q, geo_fail: !g }) });
@@ -98,7 +150,7 @@ Deno.serve(async (req) => {
   for (const [a, b] of pairs) {
     const k = `${a.id}>${b.id}`;
     if (a.lat == null || b.lat == null) { legs[k] = { missing: [a.lat == null ? a.title : null, b.lat == null ? b.title : null].filter(Boolean) }; continue; }
-    legs[k] = (await route(a, b)) || { fail: true };
+    legs[k] = (await route(a, b)) || estimate(a, b);
   }
   return json({ ok: true, legs });
 });

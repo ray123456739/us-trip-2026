@@ -43,6 +43,7 @@ async function readLink(url: string) {
       headers: { "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)", "Accept-Language": "zh-TW,en;q=0.8" } });
     clearTimeout(t);
     const html = (await r.text()).slice(0, 400000);
+    console.log("readLink", host, r.status, html.length);
     const parts = [meta(html, "og:title"), meta(html, "og:description"), meta(html, "description"),
       (html.match(/<title[^>]*>([^<]*)<\/title>/i) || [])[1] || ""].map(decode).map(s => s.trim()).filter(Boolean);
     return [...new Set(parts)].join("\n").slice(0, 3000);
@@ -69,7 +70,10 @@ Deno.serve(async (req) => {
 
   // 2. 讀連結裡的文字
   const url = (body.url || "").slice(0, 1000), hint = (body.hint || "").slice(0, 300);
-  const linkText = await readLink(url);
+  let linkText = await readLink(url);
+  // IG 擋讀取時只會回「Instagram」這種空殼標題，當作讀不到
+  if (linkText.replace(/instagram|tiktok|youtube|log in|登入|\s|[•·|-]/gi, "").length < 12) linkText = "";
+  console.log("linkText", linkText.length, linkText.slice(0, 200).replace(/\n/g, " / "));
   if (!linkText && !hint) return json({ error: "nothing_to_read" }, 200);
 
   // 3. 整理每天已經排的行程
@@ -97,7 +101,7 @@ ${linkText || "（讀不到）"}
 - 如果判斷不出地點，或地點不在這趟會去的區域，day 留空字串。
 - 不要編造店名；連結文字沒寫清楚就照實說不確定。
 
-只輸出一個 JSON，不要其他文字：
+不管判斷得出來與否，都只輸出一個 JSON（判斷不出就把欄位留空字串），開頭是 { 結尾是 }，不要加任何說明文字或 markdown：
 {"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域或城市，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"早上／中午／下午／傍晚／晚上，或明確時間如 19:30，不確定就空字串","stay":"建議停留多久，例如 1 小時、2–3 小時、半天","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內","confidence":"high、medium 或 low"}`;
 
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
@@ -106,10 +110,13 @@ ${linkText || "（讀不到）"}
   if (!ar.ok) { console.error("anthropic", ar.status, await ar.text()); return json({ error: "ai_failed", status: ar.status }, 502); }
   const out = await ar.json();
   const text = (out.content || []).map((c: { text?: string }) => c.text || "").join("");
-  const m = text.match(/\{[\s\S]*\}/);
-  if (!m) return json({ error: "ai_unclear" }, 200);
-  let r: Record<string, string>;
-  try { r = JSON.parse(m[0]); } catch { return json({ error: "ai_unclear" }, 200); }
+  console.log("ai raw", text.slice(0, 500).replace(/\n/g, " / "));
+  const cleaned = text.replace(/```(?:json)?/gi, "");
+  const m = cleaned.match(/\{[\s\S]*\}/);
+  let r: Record<string, string> | null = null;
+  if (m) { try { r = JSON.parse(m[0]); } catch { /* 下面處理 */ } }
+  if (!r) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read", say: cleaned.slice(0, 200) }, 200);
+  if (!r.place && !r.day) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
   if (r.day && !DAYS.some(d => d[0] === r.day)) r.day = "";
   return json({ ok: true, read_link: !!linkText, place: r.place || "", area: r.area || "", day: r.day || "",
     time: r.time || "", stay: r.stay || "", note: r.note || "", confidence: r.confidence || "low" });

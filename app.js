@@ -266,7 +266,7 @@ function mapsUrl(it) {
 /* 交通行程（開車、出發、入住、搭機這類）不算景點，不幫它算路線 */
 const isTransit = it => /出發|開往|開回|抵達|搭機|入住|回程|休息/.test(it.title || "");
 /* 交通時間：伺服器用 OpenStreetMap 算好，存在這支手機上，行程沒變就不重算 */
-const legCache = (() => { try { return JSON.parse(store.get("trip.legs") || "{}"); } catch { return {}; } })();
+const legCache = (() => { try { return JSON.parse(store.get("trip.legs2") || "{}"); } catch { return {}; } })();
 const legBusy = new Set(), legRetry = {};
 const daySig = list => list.map(i => i.id + ":" + i.title).join("|");
 const fmtMin = m => m < 60 ? `約 ${m} 分鐘` : `約 ${Math.floor(m / 60)} 小時${m % 60 ? " " + (m % 60) + " 分" : ""}`;
@@ -275,7 +275,7 @@ function legInfo(a, b) {
   if (!c || c.sig !== daySig(sorted(a.day))) return { text: "正在計算交通時間…", wait: true };
   const r = c.legs[a.id + ">" + b.id];
   if (!r) return { text: "到下一站的交通時間" };
-  if (r.min) return { text: `${fmtMin(r.min)} · ${r.km} 公里`, sub: "不含塞車", ok: true };
+  if (r.min) return { text: `${fmtMin(r.min)} · ${r.km} 公里`, sub: r.rough ? "粗估，點開看實際路線" : "不含塞車", ok: true };
   if (r.missing) return { text: `找不到「${r.missing[0]}」的位置`, sub: "改成更完整的店名試試" };
   return { text: "暫時算不出來" };
 }
@@ -305,7 +305,7 @@ async function loadLegs() {
     finally { legBusy.delete(d.key); }
   }
   legLoop = false;
-  if (changed) { store.set("trip.legs", JSON.stringify(legCache)); render(); }
+  if (changed) { store.set("trip.legs2", JSON.stringify(legCache)); render(); }
 }
 function fill(ul, list, emptyText, draft, legs) {
   if (!list.length) { ul.replaceChildren(h("li", { class: "empty" }, emptyText)); return; }
@@ -408,7 +408,8 @@ async function aiRun() {
     const j = await r.json().catch(() => ({}));
     if (r.status === 401 || j.error === "bad_passcode") { onErr({ code: "28P01", message: "bad_passcode" }); return; }
     if (j.error === "no_api_key") { aiShow("warn", "AI 還沒設定好（Supabase 裡還沒放 API 金鑰），先自己選日期吧。"); return; }
-    if (j.error === "nothing_to_read") { aiShow("warn", "讀不到這支影片的文字說明。在「這是哪裡」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); return; }
+    if (j.error === "nothing_to_read") { aiShow("warn", "IG 擋住了，讀不到這支影片的文字說明。在「這是哪裡」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
+    if (j.error === "not_identified") { aiShow("warn", "AI 看不出這是哪裡。在「這是哪裡」寫得更具體一點（例如英文店名或所在區域），再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
     if (!j.ok) { aiShow("warn", "AI 暫時沒回應，可以稍後再試，或自己選日期。"); return; }
     /* 直接排進行程：AI 的判斷優先，你自己有填的時間、停留、備註會保留 */
     const place = [j.place, j.area && !String(j.place).includes(j.area) ? j.area : ""].filter(Boolean).join("，");
