@@ -78,11 +78,11 @@ ${q.body}
 
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 900, messages: [{ role: "user", content: prompt }] }) });
+    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 8000, output_config: { effort: "medium" }, messages: [{ role: "user", content: prompt }] }) });
   if (!ar.ok) { console.error("anthropic", ar.status, await ar.text()); return json({ error: "ai_failed" }, 502); }
   const out = await ar.json();
   const text = (out.content || []).map((c: { text?: string }) => c.text || "").join("").trim();
-  if (!text) return json({ error: "ai_unclear" }, 200);
+  if (!text) { console.log("ask empty", out.stop_reason); return json({ error: "ai_unclear" }, 200); }
 
   const ir = await fetch(`${base}/rest/v1/answers`, { method: "POST", headers: { ...hd, Prefer: "return=representation" },
     body: JSON.stringify({ question_id: q.id, body: text.slice(0, 4000), answered_by: "AI 小幫手", is_ai: true }) });

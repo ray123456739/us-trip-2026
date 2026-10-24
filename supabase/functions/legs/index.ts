@@ -62,7 +62,7 @@ async function aiGeo(title: string, city: string) {
   try {
     const r = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 80, messages: [{ role: "user", content:
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 4000, output_config: { effort: "low" }, messages: [{ role: "user", content:
         `"${title}" 這個地點在 ${CITY_EN[city] || "美國"} 附近，它的經緯度是多少？如果這不是一個具體地點（例如「吃晚餐」「逛 Outlet」）或你不確定，回答 none。只回答「緯度,經度」或 none，不要其他文字。` }] }) });
     const j = await r.json();
     const t = (j.content || []).map((c: { text?: string }) => c.text || "").join("").trim();

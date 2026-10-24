@@ -106,11 +106,11 @@ ${linkText || "（讀不到）"}
 
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 500, messages: [{ role: "user", content: prompt }] }) });
+    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 8000, output_config: { effort: "low" }, messages: [{ role: "user", content: prompt }] }) });
   if (!ar.ok) { console.error("anthropic", ar.status, await ar.text()); return json({ error: "ai_failed", status: ar.status }, 502); }
   const out = await ar.json();
   const text = (out.content || []).map((c: { text?: string }) => c.text || "").join("");
-  console.log("ai raw", text.slice(0, 500).replace(/\n/g, " / "));
+  console.log("ai raw", out.stop_reason, text.slice(0, 500).replace(/\n/g, " / "));
   const cleaned = text.replace(/```(?:json)?/gi, "");
   const m = cleaned.match(/\{[\s\S]*\}/);
   let r: Record<string, string> | null = null;
