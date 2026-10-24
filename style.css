@@ -71,7 +71,15 @@ input[type=text],input[type=password],select,textarea{width:100%;background:var(
 textarea{resize:vertical;min-height:44px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 @media (max-width:520px){.row2{grid-template-columns:1fr}}
+.urlrow{display:flex;gap:8px;align-items:stretch}
+.urlrow .urlbox{flex:1;min-width:0}
+.btn.ai{flex:none;background:var(--ink);color:var(--bg);white-space:nowrap}
+.aibox{font-size:13.5px;border-radius:10px;padding:10px 12px;background:var(--soft);line-height:1.5}
+.aibox.ok{background:color-mix(in srgb,var(--sign) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--sign) 35%,transparent)}
+.aibox.warn{background:var(--amber-soft)}
+.aibox b{font-weight:700}
 .urlbox{position:relative}
+.urlbox input{padding-right:80px}
 .urlbox .tag{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none}
 .actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .btn{border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer;background:var(--sign);color:var(--sign-ink)}

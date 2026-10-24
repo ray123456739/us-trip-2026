@@ -279,13 +279,45 @@ async function changeCover(day) {
   run(async () => { const p = await uploadPhoto(f); await rpc("trip_set_cover", { p: pass, d: day, ph: p }); toast(dayLabel(day) + " 的封面換好了"); });
 }
 
+/* ---------- AI 判斷 ---------- */
+let aiFilled = {}, aiBusy = false;
+function aiShow(kind, ...kids) { const b = $("#fAiBox"); b.className = "aibox " + kind; b.replaceChildren(...kids); b.hidden = false; }
+async function aiRun() {
+  if (aiBusy) return;
+  const url = cleanUrl($("#fUrl").value), hint = $("#fTitle").value.trim();
+  if (!isHttp(url) && !hint) { aiShow("warn", "先貼一個連結，或在「這是哪裡」寫個名稱，AI 才能判斷。"); return; }
+  aiBusy = true; $("#fAi").disabled = true; aiShow("", "✨ AI 正在看這個連結，大約 5 秒…");
+  try {
+    const r = await fetch(`${BASE}/functions/v1/analyze`, { method: "POST", headers: headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ p: pass, url: isHttp(url) ? url : "", hint }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 || j.error === "bad_passcode") { onErr({ code: "28P01", message: "bad_passcode" }); return; }
+    if (j.error === "no_api_key") { aiShow("warn", "AI 還沒設定好（Supabase 裡還沒放 API 金鑰），先自己選日期吧。"); return; }
+    if (j.error === "nothing_to_read") { aiShow("warn", "讀不到這支影片的文字說明。在「這是哪裡」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); return; }
+    if (!j.ok) { aiShow("warn", "AI 暫時沒回應，可以稍後再試，或自己選日期。"); return; }
+    const t = $("#fTitle"), tm = $("#fTime"), nt = $("#fNote");
+    const place = [j.place, j.area && !String(j.place).includes(j.area) ? j.area : ""].filter(Boolean).join("，");
+    if (place && (!t.value.trim() || t.value === aiFilled.title)) { t.value = place; aiFilled.title = place; }
+    if (j.time && (!tm.value.trim() || tm.value === aiFilled.time)) { tm.value = j.time; aiFilled.time = j.time; }
+    if (j.note && (!nt.value.trim() || nt.value === aiFilled.note)) { nt.value = j.note; aiFilled.note = j.note; }
+    $("#fDay").value = j.day || "";
+    const where = j.day ? `建議排 ${dayLabel(j.day)}${j.time ? " " + j.time : ""}` : "沒找到適合的日子，先放想去清單";
+    aiShow(j.confidence === "low" ? "warn" : "ok",
+      h("b", {}, `📍 ${place || "不太確定是哪裡"}`), h("br"), where + "。",
+      j.confidence === "low" ? " AI 不太確定，請再確認一下。" : "",
+      h("br"), h("span", { class: "muted" }, j.read_link ? "已經幫你填好，可以自己改，按「加進行程」才會存。" : "讀不到影片文字，是用你填的名稱判斷的。可以自己改，按「加進行程」才會存。"));
+  } catch { aiShow("warn", "連不上 AI，請確認網路後再試。"); }
+  finally { aiBusy = false; $("#fAi").disabled = false; }
+}
+
 /* ---------- 新增表單 ---------- */
 let pendingPhoto = null;
 function initForm() {
   const fUrl = $("#fUrl"), fTag = $("#fTag");
   const updTag = () => { const u = cleanUrl(fUrl.value); if (u && isHttp(u)) { const s = source(u); fTag.textContent = s.label; fTag.className = "tag " + s.k; fTag.hidden = false; } else fTag.hidden = true; };
   fUrl.addEventListener("input", updTag);
-  fUrl.addEventListener("paste", () => setTimeout(() => { fUrl.value = cleanUrl(fUrl.value); updTag(); $("#fTitle").focus(); }, 0));
+  fUrl.addEventListener("paste", () => setTimeout(() => { fUrl.value = cleanUrl(fUrl.value); updTag(); if (isHttp(fUrl.value)) aiRun(); else $("#fTitle").focus(); }, 0));
+  $("#fAi").addEventListener("click", aiRun);
   const clearPhoto = () => { pendingPhoto = null; $("#fPhoto").value = ""; $("#fPreview").hidden = true; const im = $("#fPreviewImg"); if (im.src) URL.revokeObjectURL(im.src); im.removeAttribute("src"); };
   $("#fPhoto").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (!f) return; pendingPhoto = f; $("#fPreviewImg").src = URL.createObjectURL(f); $("#fPreview").hidden = false; });
   $("#fPhotoClear").addEventListener("click", clearPhoto);
@@ -296,8 +328,8 @@ function initForm() {
     $("#fMsg").textContent = pendingPhoto ? "照片上傳中…" : ""; $("#fBtn").disabled = true;
     run(async () => {
       const photo = pendingPhoto ? await uploadPhoto(pendingPhoto) : "";
-      await rpc("trip_save", { p: pass, it: { title: title || source(url).label + " 收藏", url, note, day, time: "", sort: Date.now(), photo, added_by: me } });
-      fUrl.value = ""; $("#fTitle").value = ""; $("#fNote").value = ""; updTag(); clearPhoto();
+      await rpc("trip_save", { p: pass, it: { title: title || source(url).label + " 收藏", url, note, day, time: $("#fTime").value.trim(), sort: Date.now(), photo, added_by: me } });
+      fUrl.value = ""; $("#fTitle").value = ""; $("#fNote").value = ""; $("#fTime").value = ""; $("#fAiBox").hidden = true; aiFilled = {}; updTag(); clearPhoto();
       toast("已加到" + dayLabel(day));
     }).finally(() => { $("#fBtn").disabled = false; $("#fMsg").textContent = ""; });
   });
