@@ -1,9 +1,12 @@
-/* Layout: one road column for the phone. Paste bar, a photo wall of wishes, then sixteen days, each opening on a cover photo with an exit-sign date. */
+/* Layout: one road column for the phone. A sunset hero, the paste bar, a wish wall, then sixteen days, each opening on a cover photo with a sun-faded date sign. */
+/* Palette: California sunshine — sunset coral, golden-hour yellow, Pacific teal, bougainvillea pink, on a hazy sky white; night mode is a Pacific night navy. */
 :root{
-  --bg:#F2F5F3; --surface:#FFFFFF; --ink:#18221D; --muted:#5A6962; --line:#D3DCD7; --soft:#E7EDE9;
-  --sign:#0E6B46; --sign-ink:#FFFFFF; --amber:#F2B51D; --amber-ink:#3A2A00; --amber-soft:#FCF1D0;
-  --danger:#B3261E; --focus:#2F6FB5; --on-photo:#FFFFFF; --shade:rgba(8,14,11,.72);
-  --sf:#C2452D; --la:#2F6FB5; --lv:#8E3FA8; --ana:#B07800;
+  --bg:#F3F8FB; --surface:#FFFFFF; --ink:#1B2436; --muted:#5E6B80; --line:#D8E2EC; --soft:#EAF1F7;
+  --sign:#E5532F; --sign-ink:#FFFFFF; --amber:#FFC23D; --amber-ink:#3D2A00; --amber-soft:#FFF2CC;
+  --ocean:#138DA0; --pink:#F2547D;
+  --sun-a:#FFC75A; --sun-b:#F2703F; --sun-c:#D93E6A; --on-sun:#FFFFFF;
+  --danger:#C2261B; --focus:#138DA0; --on-photo:#FFFFFF; --shade:rgba(12,18,32,.72);
+  --sf:#E5532F; --la:#F2547D; --lv:#8A4FD1; --ana:#138DA0;
   --display:"Overpass","Noto Sans TC",system-ui,sans-serif;
   --body:"Noto Sans TC","Overpass",system-ui,sans-serif;
   --mono:"Overpass Mono",ui-monospace,SFMono-Regular,monospace;
@@ -11,15 +14,19 @@
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#111613; --surface:#1A211D; --ink:#E5ECE8; --muted:#98A79F; --line:#2B3530; --soft:#222A26;
-  --sign:#1E8A5B; --sign-ink:#FFFFFF; --amber:#E2AA17; --amber-ink:#271B00; --amber-soft:#2D2712;
-  --danger:#F08A80; --focus:#7FB0EA; --shade:rgba(0,0,0,.78);
-  --sf:#E57C63; --la:#71A5E2; --lv:#C688DB; --ana:#E2B23E; color-scheme:dark } }
+  --bg:#0E1626; --surface:#162135; --ink:#EAF0F7; --muted:#9AA8BD; --line:#26344C; --soft:#1C2940;
+  --sign:#FF6A48; --sign-ink:#FFFFFF; --amber:#FFC94F; --amber-ink:#2A1D00; --amber-soft:#3A2E12;
+  --ocean:#3CC2D3; --pink:#FF7A9C;
+  --sun-a:#E8A43C; --sun-b:#E06A3A; --sun-c:#C93D6A; --on-sun:#FFFFFF;
+  --danger:#FF8A80; --focus:#3CC2D3; --shade:rgba(0,0,0,.78);
+  --sf:#FF7A5C; --la:#FF7A9C; --lv:#B88AF0; --ana:#3CC2D3; color-scheme:dark } }
 :root[data-theme="dark"]{
-  --bg:#111613; --surface:#1A211D; --ink:#E5ECE8; --muted:#98A79F; --line:#2B3530; --soft:#222A26;
-  --sign:#1E8A5B; --sign-ink:#FFFFFF; --amber:#E2AA17; --amber-ink:#271B00; --amber-soft:#2D2712;
-  --danger:#F08A80; --focus:#7FB0EA; --shade:rgba(0,0,0,.78);
-  --sf:#E57C63; --la:#71A5E2; --lv:#C688DB; --ana:#E2B23E; color-scheme:dark }
+  --bg:#0E1626; --surface:#162135; --ink:#EAF0F7; --muted:#9AA8BD; --line:#26344C; --soft:#1C2940;
+  --sign:#FF6A48; --sign-ink:#FFFFFF; --amber:#FFC94F; --amber-ink:#2A1D00; --amber-soft:#3A2E12;
+  --ocean:#3CC2D3; --pink:#FF7A9C;
+  --sun-a:#E8A43C; --sun-b:#E06A3A; --sun-c:#C93D6A; --on-sun:#FFFFFF;
+  --danger:#FF8A80; --focus:#3CC2D3; --shade:rgba(0,0,0,.78);
+  --sf:#FF7A5C; --la:#FF7A9C; --lv:#B88AF0; --ana:#3CC2D3; color-scheme:dark }
 
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -49,17 +56,25 @@ button,input,select,textarea{font:inherit;color:inherit}
 .stack{display:flex;flex-direction:column;gap:12px;margin-top:10px}
 .err{color:var(--danger);font-size:14px;min-height:1.2em}
 
-/* hero */
+/* hero: the one bold move — a sunset band with a low sun and a sea line */
+.hero{position:relative;overflow:hidden;border-radius:22px;padding:22px 20px 20px;color:var(--on-sun);
+  background:linear-gradient(180deg,var(--sun-c) 0%,var(--sun-b) 58%,var(--sun-a) 100%)}
+.hero::before{content:"";position:absolute;width:170px;height:170px;border-radius:50%;right:18px;bottom:-96px;
+  background:radial-gradient(circle,rgba(255,255,255,.55) 0 42%,rgba(255,255,255,.18) 43% 60%,transparent 61%)}
+.hero::after{content:"";position:absolute;left:0;right:0;bottom:0;height:16px;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.28) 0 26px,transparent 26px 40px);
+  mask-image:linear-gradient(180deg,transparent 0 40%,#000 40% 60%,transparent 60%);-webkit-mask-image:linear-gradient(180deg,transparent 0 40%,#000 40% 60%,transparent 60%)}
+.hero>*{position:relative}
 .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
-.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(30px,8vw,44px);line-height:1.08;margin:6px 0;text-wrap:balance}
+.hero .eyebrow{color:var(--on-sun);opacity:.9}
+.hero h1{font-family:var(--display);font-weight:900;font-size:clamp(30px,8vw,44px);line-height:1.08;margin:6px 0;text-wrap:balance;text-shadow:0 1px 2px rgba(80,10,30,.25)}
+.hero .eyebrow,.hero .count{text-shadow:0 1px 2px rgba(80,10,30,.25)}
 .count{color:var(--muted);margin:0}
+.hero .count{color:var(--on-sun);opacity:.95}
 .route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:14px}
 .route .arr{color:var(--muted);font-family:var(--mono)}
-
-.namebar{background:var(--amber-soft);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
-.namebar label{font-size:14px;font-weight:700}
-.namebar-row{display:flex;gap:8px}
-.namebar-row input{flex:1}
+.hero .route .arr{color:var(--on-sun)}
+.hero .route .sign{background:rgba(255,255,255,.92);color:var(--sign);border-color:transparent;box-shadow:none}
 
 /* forms */
 .add{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
@@ -73,7 +88,7 @@ textarea{resize:vertical;min-height:44px}
 @media (max-width:520px){.row2{grid-template-columns:1fr}}
 .urlrow{display:flex;gap:8px;align-items:stretch}
 .urlrow .urlbox{flex:1;min-width:0}
-.btn.ai{flex:none;background:var(--ink);color:var(--bg);white-space:nowrap}
+.btn.ai{flex:none;background:linear-gradient(100deg,var(--sun-b),var(--sun-c));color:var(--on-sun);white-space:nowrap;text-shadow:0 1px 1px rgba(80,10,30,.2)}
 .btn.wide{width:100%;padding:13px}
 .manual{border-top:1px dashed var(--line);padding-top:10px}
 .manual>summary{cursor:pointer;color:var(--muted);font-size:13.5px;padding:4px 0}
