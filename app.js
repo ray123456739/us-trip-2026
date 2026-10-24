@@ -299,7 +299,7 @@ async function start() {
 }
 
 /* 第一次用一鍵連結進來的人，請他留個名字 */
-$("#nameForm").addEventListener("submit", ev => {
+$("#nameBar").addEventListener("submit", ev => {
   ev.preventDefault(); const n = $("#nName").value.trim(); if (!n) return;
   me = n; store.set("trip.name", n); $("#nameBar").hidden = true; toast(`嗨 ${n}，之後你加的行程都會標上名字`);
 });
