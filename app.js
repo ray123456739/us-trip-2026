@@ -373,8 +373,25 @@ function editEl(it, v) {
         ? h("span", { class: "confirm" }, "確定刪除？",
             h("button", { class: "btn danger sm", type: "button", onclick: () => run(async () => { await rpc("trip_delete", { p: pass, item_id: id }); openId = null; confirmId = null; toast("已刪除"); }) }, "刪除"),
             h("button", { class: "btn ghost sm", type: "button", onclick: () => { confirmId = null; render(); } }, "保留"))
-        : h("button", { class: "btn ghost sm", type: "button", onclick: () => { confirmId = id; render(); } }, "刪除")));
+        : h("button", { class: "btn ghost sm", type: "button", onclick: () => { confirmId = id; render(); } }, "刪除")),
+    batchDeleteEl(it));
   return e;
+}
+/* 同一支影片（同一個連結）一次加進來的行程，可以整批刪掉 */
+function batchDeleteEl(it) {
+  if (!it.url) return null;
+  const same = items.filter(x => x.url === it.url);
+  if (same.length < 2) return null;
+  const where = [...new Set(same.map(x => x.day ? dayLabel(x.day) : "想去清單"))].join("、");
+  const label = `${["ig", "tt", "yt", "xhs"].includes(source(it.url).k) ? "支影片" : "個連結"}加進來的 ${same.length} 個行程`;
+  return h("div", { class: "batch" },
+    confirmId === "url:" + it.id
+      ? h("span", { class: "confirm" }, `確定刪掉這${label}（${where}）？`,
+          h("button", { class: "btn danger sm", type: "button", onclick: () => run(async () => {
+            for (const x of same) await rpc("trip_delete", { p: pass, item_id: x.id });
+            openId = null; confirmId = null; toast(`已刪掉 ${same.length} 個行程`); }) }, "全部刪除"),
+          h("button", { class: "btn ghost sm", type: "button", onclick: () => { confirmId = null; render(); } }, "保留"))
+      : h("button", { class: "linkbtn", type: "button", onclick: () => { confirmId = "url:" + it.id; render(); } }, `🗑 刪掉這${label}`));
 }
 
 /* ---------- 寫入 ---------- */
