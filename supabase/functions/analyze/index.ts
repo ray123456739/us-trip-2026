@@ -98,18 +98,20 @@ ${linkText || "（讀不到）"}
 - 一支影片常常介紹好幾個地點（一日遊路線、清單型影片）。請把每個「具體、叫得出名字的地點」都拆成一筆，最多 8 筆。像「LA 一日遊」這種總稱不算地點。
 - 已經在上面行程「已排」裡的同一個地點（名稱相同或明顯是同一處），不要再列進 places，改放進 skipped，reason 寫「行程裡已經有了」。
 - 只能排在「住的城市」跟地點相符的日子。Santa Monica、Hollywood、Beverly Hills、Highland Park 等算洛杉磯；Irvine、Huntington Beach、Newport 等橘郡地點算 Anaheim；Red Rock、Hoover Dam 算 Las Vegas；Napa、Muir Woods、Sausalito、Monterey 可排在 12/02–12/04 舊金山的空白日。
-- 開車日只在地點剛好在路上時才排（例如 Barstow Outlet、Harris Ranch、Pismo Beach），否則避開。11/29、11/30 整天在迪士尼，除非是迪士尼裡面或 Downtown Disney 的東西，否則避開。
+- 開車日（11/21、11/24、11/28、12/01）大半天在開車，人也累，只排剛好在路上的休息點（例如 Barstow Outlet、Harris Ranch、Pismo Beach）或抵達後晚上順路吃飯的地方，其他一律不要排在開車日。11/20 是紅眼班機抵達日，只排輕鬆的。11/29、11/30 整天在迪士尼，除非是迪士尼裡面或 Downtown Disney 的東西，否則避開。12/05 早上要去機場，不要排。
 - 同一支影片裡同一區的地點（例如一條散步路線），盡量排在同一天，照影片的順序給時段，讓它們可以一起逛。
-- 優先選同城市裡行程比較少的那天；看地點類型決定時段（早午餐→早上、夕陽景點→傍晚、夜景秀和酒吧→晚上），時段要排在當天已排行程的空檔，不要撞時間。
+- 排之前先算每天的負擔：一天大約從 9:00 玩到 21:00，扣掉已排行程的停留時間和交通，剩下的才是空檔。一天最多 2–3 個需要 2 小時以上的大景點（博物館、主題園區、國家公園）；當天已經滿了就換同城市的另一天；同城市每天都滿了，就把 day 留空字串放進想去清單，note 寫「行程已滿，先放想去清單」。
+- 同一天裡的時段不能重疊：每個地點給明確開始時間（例如 10:00、13:30），要接在當天已排行程和你這次排的前一個地點結束之後，並留移動時間。看地點類型挑合理時段：早午餐和咖啡店在早上、博物館白天、夕陽景點在傍晚（11 月底約 16:45 日落）、夜景和秀在晚上。
+- 不同區域的地點不要硬塞同一天，例如 Getty Center（西區山上）和 Downtown 的地點；Getty Center 和 Getty Villa 是兩個不同地方、各要 2 小時以上，不要排在同一個早上。
 - 地點不在這趟會去的區域（例如亞利桑那州），還是列進 places，但 day 留空字串，note 說明不在路線上。
 - 不要編造店名；連結文字沒寫清楚的就不要列。
 
 不管判斷得出來與否，都只輸出一個 JSON，開頭是 { 結尾是 }，不要加任何說明文字或 markdown：
-{"places":[{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"早上／中午／下午／傍晚／晚上，或明確時間如 19:30，不確定就空字串","stay":"建議停留多久，例如 1 小時","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內"}],"skipped":[{"place":"地點名稱","reason":"為什麼沒加"}],"confidence":"high、medium 或 low"}`;
+{"places":[{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"開始時間，例如 10:00、13:30；放想去清單的就空字串","stay":"建議停留多久，例如 1 小時","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內"}],"skipped":[{"place":"地點名稱","reason":"為什麼沒加"}],"confidence":"high、medium 或 low"}`;
 
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 12000, output_config: { effort: "low" }, messages: [{ role: "user", content: prompt }] }) });
+    body: JSON.stringify({ model: "claude-sonnet-5-5", max_tokens: 16000, output_config: { effort: "medium" }, messages: [{ role: "user", content: prompt }] }) });
   if (!ar.ok) { console.error("anthropic", ar.status, await ar.text()); return json({ error: "ai_failed", status: ar.status }, 502); }
   const out = await ar.json();
   const text = (out.content || []).map((c: { text?: string }) => c.text || "").join("");
@@ -129,5 +131,8 @@ ${linkText || "（讀不到）"}
   const skipped = (Array.isArray(r.skipped) ? r.skipped : []).slice(0, 10)
     .map((x: Record<string, unknown>) => ({ place: str(x.place, 200), reason: str(x.reason, 100) })).filter((x: { place: string }) => x.place);
   if (!places.length && !skipped.length) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
-  return json({ ok: true, read_link: !!linkText, places, skipped, confidence: str(r.confidence, 10) || "low" });
+  const f = places[0] || { place: "", area: "", day: "", time: "", stay: "", note: "" };
+  // 舊版網頁只看得懂單一地點，附上第一個地點的欄位，避免存成空項目
+  return json({ ok: true, read_link: !!linkText, places, skipped, confidence: str(r.confidence, 10) || "low",
+    place: f.place, area: f.area, day: f.day, time: f.time, stay: f.stay, note: f.note });
 });
