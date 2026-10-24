@@ -178,6 +178,7 @@ function render() {
     fill($("#list-" + d.key), sorted(d.key), "這天還空著。", draft, true);
     renderCover(d);
   }
+  loadLegs();
 }
 /* 封面：自己上傳的照片優先，沒有就用城市預設照片（Wikimedia Commons） */
 function renderCover(d) {
@@ -207,10 +208,47 @@ function mapsUrl(it) {
 }
 /* 交通行程（開車、出發、入住、搭機這類）不算景點，不幫它算路線 */
 const isTransit = it => /出發|開往|開回|抵達|搭機|入住|回程|休息/.test(it.title || "");
+/* 交通時間：伺服器用 OpenStreetMap 算好，存在這支手機上，行程沒變就不重算 */
+const legCache = (() => { try { return JSON.parse(store.get("trip.legs") || "{}"); } catch { return {}; } })();
+const legBusy = new Set(), legRetry = {};
+const daySig = list => list.map(i => i.id + ":" + i.title).join("|");
+const fmtMin = m => m < 60 ? `約 ${m} 分鐘` : `約 ${Math.floor(m / 60)} 小時${m % 60 ? " " + (m % 60) + " 分" : ""}`;
+function legInfo(a, b) {
+  const c = legCache[a.day];
+  if (!c || c.sig !== daySig(sorted(a.day))) return { text: "正在計算交通時間…", wait: true };
+  const r = c.legs[a.id + ">" + b.id];
+  if (!r) return { text: "到下一站的交通時間" };
+  if (r.min) return { text: `${fmtMin(r.min)} · ${r.km} 公里`, sub: "不含塞車", ok: true };
+  if (r.missing) return { text: `找不到「${r.missing[0]}」的位置`, sub: "改成更完整的店名試試" };
+  return { text: "暫時算不出來" };
+}
 function legEl(a, b) {
   const href = "https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=" + encodeURIComponent(placeQuery(a)) + "&destination=" + encodeURIComponent(placeQuery(b));
-  return h("li", { class: "leg" }, h("a", { href, target: "_blank", rel: "noopener noreferrer" },
-    h("span", { class: "leg-ic", "aria-hidden": "true" }, "🚗"), h("span", {}, "到下一站的交通時間"), h("span", { class: "leg-go" }, "Google 地圖 ›")));
+  const info = legInfo(a, b);
+  return h("li", { class: "leg" + (info.ok ? " ok" : "") + (info.wait ? " wait" : "") }, h("a", { href, target: "_blank", rel: "noopener noreferrer" },
+    h("span", { class: "leg-ic", "aria-hidden": "true" }, "🚗"),
+    h("span", { class: "leg-txt" }, h("span", { class: "leg-main" }, info.text), info.sub ? h("span", { class: "leg-sub" }, info.sub) : null),
+    h("span", { class: "leg-go" }, "Google 地圖 ›")));
+}
+let legLoop = false;
+async function loadLegs() {
+  if (legLoop || !loaded) return; legLoop = true;
+  let changed = false;
+  for (const d of DAYS) {
+    const list = sorted(d.key), sig = daySig(list);
+    const hasPair = list.some((it, i) => list[i + 1] && !isTransit(it) && !isTransit(list[i + 1]));
+    if (!hasPair || (legCache[d.key] && legCache[d.key].sig === sig) || legBusy.has(d.key)) continue;
+    if (legRetry[d.key] && Date.now() < legRetry[d.key]) continue;
+    legBusy.add(d.key);
+    try {
+      const r = await fetch(`${BASE}/functions/v1/legs`, { method: "POST", headers: headers({ "Content-Type": "application/json" }), body: JSON.stringify({ p: pass, day: d.key }) });
+      const j = await r.json();
+      if (j.ok) { legCache[d.key] = { sig, legs: j.legs }; changed = true; } else legRetry[d.key] = Date.now() + 60000;
+    } catch { legRetry[d.key] = Date.now() + 60000; }
+    finally { legBusy.delete(d.key); }
+  }
+  legLoop = false;
+  if (changed) { store.set("trip.legs", JSON.stringify(legCache)); render(); }
 }
 function fill(ul, list, emptyText, draft, legs) {
   if (!list.length) { ul.replaceChildren(h("li", { class: "empty" }, emptyText)); return; }

@@ -83,7 +83,11 @@ textarea{resize:vertical;min-height:44px}
 .list .leg{list-style:none;margin:-2px 0}
 .leg a{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);text-decoration:none;padding:6px 10px;border-radius:9px;border:1px dashed var(--line);background:transparent}
 .leg a:hover{border-color:var(--muted);color:var(--ink)}
-.leg-go{margin-left:auto;font-weight:600;color:var(--sign)}
+.leg-go{margin-left:auto;font-weight:600;color:var(--sign);flex:none}
+.leg-txt{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.leg.ok .leg-main{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+.leg-sub{font-size:11px;color:var(--muted)}
+.leg.wait .leg-main{opacity:.7}
 .urlbox{position:relative}
 .urlbox input{padding-right:80px}
 .urlbox .tag{position:absolute;right:8px;top:50%;transform:translateY(-50%);pointer-events:none}
