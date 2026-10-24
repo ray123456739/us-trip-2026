@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
   const schedule = DAYS.map(([d, wd, c, note]) =>
     `${d}（${wd}）住${CITY[c]}${note ? "；" + note : ""}；已排：${(byDay[d] || []).join("、") || "（空）"}`).join("\n");
 
-  const prompt = `你是幫兩個台灣旅客排美西自駕行程的助手。請根據下面的連結內容，判斷這是什麼地點，並建議排在哪一天、什麼時段。
+  const prompt = `你是幫兩個台灣旅客排美西自駕行程的助手。請根據下面的連結內容，找出裡面介紹的地點，並建議每個地點排在哪一天、什麼時段。
 
 <行程>
 ${schedule}
@@ -95,29 +95,39 @@ ${linkText || "（讀不到）"}
 <使用者補充>${hint || "（無）"}</使用者補充>
 
 規則：
-- 只能排在「住的城市」跟地點相符的日子。Santa Monica、Hollywood、Beverly Hills 等算洛杉磯；Irvine、Huntington Beach、Newport 等橘郡地點算 Anaheim；Red Rock、Hoover Dam 算 Las Vegas；Napa、Muir Woods、Sausalito、Monterey 可排在 12/02–12/04 舊金山的空白日。
+- 一支影片常常介紹好幾個地點（一日遊路線、清單型影片）。請把每個「具體、叫得出名字的地點」都拆成一筆，最多 8 筆。像「LA 一日遊」這種總稱不算地點。
+- 已經在上面行程「已排」裡的同一個地點（名稱相同或明顯是同一處），不要再列進 places，改放進 skipped，reason 寫「行程裡已經有了」。
+- 只能排在「住的城市」跟地點相符的日子。Santa Monica、Hollywood、Beverly Hills、Highland Park 等算洛杉磯；Irvine、Huntington Beach、Newport 等橘郡地點算 Anaheim；Red Rock、Hoover Dam 算 Las Vegas；Napa、Muir Woods、Sausalito、Monterey 可排在 12/02–12/04 舊金山的空白日。
 - 開車日只在地點剛好在路上時才排（例如 Barstow Outlet、Harris Ranch、Pismo Beach），否則避開。11/29、11/30 整天在迪士尼，除非是迪士尼裡面或 Downtown Disney 的東西，否則避開。
+- 同一支影片裡同一區的地點（例如一條散步路線），盡量排在同一天，照影片的順序給時段，讓它們可以一起逛。
 - 優先選同城市裡行程比較少的那天；看地點類型決定時段（早午餐→早上、夕陽景點→傍晚、夜景秀和酒吧→晚上），時段要排在當天已排行程的空檔，不要撞時間。
-- 如果判斷不出地點，或地點不在這趟會去的區域，day 留空字串。
-- 不要編造店名；連結文字沒寫清楚就照實說不確定。
+- 地點不在這趟會去的區域（例如亞利桑那州），還是列進 places，但 day 留空字串，note 說明不在路線上。
+- 不要編造店名；連結文字沒寫清楚的就不要列。
 
-不管判斷得出來與否，都只輸出一個 JSON（判斷不出就把欄位留空字串），開頭是 { 結尾是 }，不要加任何說明文字或 markdown：
-{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域或城市，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"早上／中午／下午／傍晚／晚上，或明確時間如 19:30，不確定就空字串","stay":"建議停留多久，例如 1 小時、2–3 小時、半天","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內","confidence":"high、medium 或 low"}`;
+不管判斷得出來與否，都只輸出一個 JSON，開頭是 { 結尾是 }，不要加任何說明文字或 markdown：
+{"places":[{"place":"地點正式名稱（英文為主，可加中文）","area":"所在區域，例如 Santa Monica","day":"YYYY-MM-DD 或空字串","time":"早上／中午／下午／傍晚／晚上，或明確時間如 19:30，不確定就空字串","stay":"建議停留多久，例如 1 小時","note":"一句繁體中文，說明這是什麼和為什麼排這天，30 字內"}],"skipped":[{"place":"地點名稱","reason":"為什麼沒加"}],"confidence":"high、medium 或 low"}`;
 
   const ar = await fetch("https://api.anthropic.com/v1/messages", { method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 8000, output_config: { effort: "low" }, messages: [{ role: "user", content: prompt }] }) });
+    body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 12000, output_config: { effort: "low" }, messages: [{ role: "user", content: prompt }] }) });
   if (!ar.ok) { console.error("anthropic", ar.status, await ar.text()); return json({ error: "ai_failed", status: ar.status }, 502); }
   const out = await ar.json();
   const text = (out.content || []).map((c: { text?: string }) => c.text || "").join("");
   console.log("ai raw", out.stop_reason, text.slice(0, 500).replace(/\n/g, " / "));
   const cleaned = text.replace(/```(?:json)?/gi, "");
   const m = cleaned.match(/\{[\s\S]*\}/);
-  let r: Record<string, string> | null = null;
+  // deno-lint-ignore no-explicit-any
+  let r: any = null;
   if (m) { try { r = JSON.parse(m[0]); } catch { /* 下面處理 */ } }
-  if (!r) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read", say: cleaned.slice(0, 200) }, 200);
-  if (!r.place && !r.day) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
-  if (r.day && !DAYS.some(d => d[0] === r.day)) r.day = "";
-  return json({ ok: true, read_link: !!linkText, place: r.place || "", area: r.area || "", day: r.day || "",
-    time: r.time || "", stay: r.stay || "", note: r.note || "", confidence: r.confidence || "low" });
+  if (!r) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
+  const valid = new Set(DAYS.map(d => d[0]));
+  const str = (v: unknown, n: number) => (typeof v === "string" ? v : "").slice(0, n);
+  const places = (Array.isArray(r.places) ? r.places : []).slice(0, 8)
+    .map((x: Record<string, unknown>) => ({ place: str(x.place, 200), area: str(x.area, 100), day: valid.has(str(x.day, 10)) ? str(x.day, 10) : "",
+      time: str(x.time, 40), stay: str(x.stay, 40), note: str(x.note, 300) }))
+    .filter((x: { place: string }) => x.place);
+  const skipped = (Array.isArray(r.skipped) ? r.skipped : []).slice(0, 10)
+    .map((x: Record<string, unknown>) => ({ place: str(x.place, 200), reason: str(x.reason, 100) })).filter((x: { place: string }) => x.place);
+  if (!places.length && !skipped.length) return json({ error: linkText || hint ? "not_identified" : "nothing_to_read" }, 200);
+  return json({ ok: true, read_link: !!linkText, places, skipped, confidence: str(r.confidence, 10) || "low" });
 });

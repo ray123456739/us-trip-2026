@@ -406,7 +406,7 @@ async function changeCover(day) {
 
 /* ---------- AI 判斷 ---------- */
 let aiFilled = {}, aiBusy = false;
-function aiShow(kind, ...kids) { const b = $("#fAiBox"); b.className = "aibox " + kind; b.replaceChildren(...kids); b.hidden = false; }
+function aiShow(kind, ...kids) { const b = $("#fAiBox"); b.className = "aibox " + kind; b.replaceChildren(...kids.filter(k => k != null && k !== "")); b.hidden = false; }
 async function aiRun() {
   if (aiBusy) return;
   const url = cleanUrl($("#fUrl").value), hint = $("#fTitle").value.trim();
@@ -421,29 +421,44 @@ async function aiRun() {
     if (j.error === "nothing_to_read") { aiShow("warn", "IG 擋住了，讀不到這支影片的文字說明。在「地點名字」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
     if (j.error === "not_identified") { aiShow("warn", "AI 看不出這是哪裡。在「地點名字」寫得更具體一點（例如英文店名或所在區域），再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
     if (!j.ok) { aiShow("warn", "AI 暫時沒回應，可以稍後再試，或自己選日期。"); return; }
-    /* 直接排進行程：AI 的判斷優先，你自己有填的時間、停留、備註會保留 */
-    const place = [j.place, j.area && !String(j.place).includes(j.area) ? j.area : ""].filter(Boolean).join("，");
+    /* 直接排進行程：一支影片可能有好幾個地點，每個各存一筆。只有一個地點時，你自己填的時間、停留、備註、筆記會保留 */
+    const places = j.places || [], skipped = j.skipped || [];
     const mine = k => $(k).value.trim();
-    aiShow("", "✨ 判斷好了，正在排進行程…");
-    const photo = pendingPhoto ? await uploadPhoto(pendingPhoto) : "";
-    const saved = await rpc("trip_save", { p: pass, it: {
-      title: place || hint || source(url).label + " 收藏", url: isHttp(url) ? url : "",
-      note: mine("#fNote") || j.note || "", day: j.day || "", time: mine("#fTime") || j.time || "",
-      stay: mine("#fStay") || j.stay || "", memo: mine("#fMemo"), sort: Date.now(), photo, added_by: me } });
-    ["#fUrl", "#fTitle", "#fNote", "#fTime", "#fStay", "#fMemo"].forEach(k => $(k).value = "");
-    $("#fUrl").dispatchEvent(new Event("input")); $("#fPhotoClear").click(); $("#fDay").value = "";
-    await refresh(); render();
-    const where = j.day ? `排進 ${dayLabel(j.day)}${j.time ? " " + j.time : ""}` : "沒找到適合的日子，先放進想去清單";
-    const go = () => { const el = document.getElementById(j.day ? "d" + j.day.replaceAll("-", "") : "wish"); if (el) el.scrollIntoView({ block: "start" }); };
-    aiShow(j.confidence === "low" ? "warn" : "ok",
-      h("b", {}, `📍 ${place || "不太確定是哪裡"}`), h("br"),
-      `已${where}${j.stay ? "，建議停留 " + j.stay : ""}。`,
-      j.confidence === "low" ? " AI 不太確定，記得確認一下。" : "",
-      !j.read_link ? h("span", { class: "muted" }, " 讀不到影片文字，是用你填的名稱判斷的。") : "",
-      h("div", { class: "aibtns" },
+    const single = places.length === 1;
+    aiShow("", places.length > 1 ? `✨ 找到 ${places.length} 個地點，正在排進行程…` : "✨ 判斷好了，正在排進行程…");
+    const photo = pendingPhoto && places.length ? await uploadPhoto(pendingPhoto) : "";
+    const saved = [], base = Date.now();
+    for (let i = 0; i < places.length; i++) {
+      const x = places[i];
+      const name = [x.place, x.area && !String(x.place).includes(x.area) ? x.area : ""].filter(Boolean).join("，");
+      const r = await rpc("trip_save", { p: pass, it: {
+        title: name, url: isHttp(url) ? url : "",
+        note: (single && mine("#fNote")) || x.note || "", day: x.day || "",
+        time: (single && mine("#fTime")) || x.time || "", stay: (single && mine("#fStay")) || x.stay || "",
+        memo: i === 0 ? mine("#fMemo") : "", sort: base + i, photo: i === 0 ? photo : "", added_by: me } });
+      saved.push({ id: r.id, name, day: x.day || "", time: x.time || "" });
+    }
+    if (saved.length) {
+      ["#fUrl", "#fTitle", "#fNote", "#fTime", "#fStay", "#fMemo"].forEach(k => $(k).value = "");
+      $("#fUrl").dispatchEvent(new Event("input")); $("#fPhotoClear").click(); $("#fDay").value = "";
+      await refresh(); render();
+    }
+    const firstDay = (saved.find(x => x.day) || saved[0] || {}).day;
+    const go = () => { const el = document.getElementById(firstDay ? "d" + firstDay.replaceAll("-", "") : "wish"); if (el) el.scrollIntoView({ block: "start" }); };
+    const rows = saved.map(x => h("li", {}, h("b", {}, x.name), " → ", x.day ? `${dayLabel(x.day)}${x.time ? " " + x.time : ""}` : "想去清單"));
+    const skips = skipped.map(x => h("li", { class: "muted" }, `${x.place}：${x.reason || "沒有加"}`));
+    aiShow(saved.length ? (j.confidence === "low" ? "warn" : "ok") : "warn",
+      saved.length ? h("div", {}, `📍 已排進 ${saved.length} 個地點：`) : h("div", {}, "這支影片裡的地點都已經在行程裡了，沒有新增。"),
+      rows.length ? h("ul", { class: "ailist" }, ...rows) : null,
+      skips.length ? h("div", { class: "muted" }, "沒有加的：") : null,
+      skips.length ? h("ul", { class: "ailist" }, ...skips) : null,
+      j.confidence === "low" && saved.length ? h("div", {}, "AI 不太確定，記得確認一下。") : null,
+      !j.read_link ? h("div", { class: "muted" }, "讀不到影片文字，是用你填的名稱判斷的。") : null,
+      saved.length ? h("div", { class: "aibtns" },
         h("button", { class: "btn sm", type: "button", onclick: go }, "去看看"),
         h("button", { class: "btn ghost sm", type: "button", onclick: () => run(async () => {
-          await rpc("trip_delete", { p: pass, item_id: saved.id }); $("#fAiBox").hidden = true; toast("已復原，沒有加進行程"); }) }, "復原")));
+          for (const x of saved) await rpc("trip_delete", { p: pass, item_id: x.id });
+          $("#fAiBox").hidden = true; toast(saved.length > 1 ? `已復原，${saved.length} 個地點都拿掉了` : "已復原，沒有加進行程"); }) }, saved.length > 1 ? "全部復原" : "復原")) : null);
   } catch { aiShow("warn", "連不上 AI，請確認網路後再試。"); }
   finally { aiBusy = false; $("#fAi").disabled = false; }
 }
