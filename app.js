@@ -166,13 +166,17 @@ function buildShell() {
       h("button", { class: "btn ghost sm add-here", type: "button", onclick: () => focusAdd(d.key) }, "＋ 加到這天"));
   }));
 }
-function focusAdd(key) { $("#fDay").value = key; $("#addForm").scrollIntoView({ block: "start" }); setTimeout(() => $("#fUrl").focus({ preventScroll: true }), 300); }
+function focusAdd(key) { $("#fDay").value = key; $("#fManual").open = true; $("#addForm").scrollIntoView({ block: "start" }); setTimeout(() => $("#fUrl").focus({ preventScroll: true }), 300); }
 
+function openEdit(id, focusCls) {
+  openId = id; confirmId = null; render();
+  const el = document.querySelector(`.edit[data-id="${id}"] .${focusCls}`); if (el) { el.focus(); el.scrollIntoView({ block: "center" }); }
+}
 function sorted(day) { return items.filter(i => (i.day || "") === day).sort((a, b) => a.sort - b.sort); }
 function render() {
   if (!loaded) return;
   let draft = null; const ed = document.querySelector(".edit[data-id]");
-  if (ed) draft = { id: ed.dataset.id, title: ed.querySelector(".eTitle").value, url: ed.querySelector(".eUrl").value, time: ed.querySelector(".eTime").value, stay: ed.querySelector(".eStay").value, note: ed.querySelector(".eNote").value, day: ed.querySelector(".eDay").value };
+  if (ed) draft = { id: ed.dataset.id, title: ed.querySelector(".eTitle").value, url: ed.querySelector(".eUrl").value, time: ed.querySelector(".eTime").value, stay: ed.querySelector(".eStay").value, memo: ed.querySelector(".eMemo").value, note: ed.querySelector(".eNote").value, day: ed.querySelector(".eDay").value };
   fill($("#list-wish"), sorted(""), "還沒有東西。在上面貼一個 Reels 連結試試。", draft);
   for (const d of DAYS) {
     fill($("#list-" + d.key), sorted(d.key), "這天還空著。", draft, true);
@@ -325,7 +329,11 @@ function itemEl(it, i, list, draft) {
   const chips = h("div", { class: "chips" },
     link && s.k !== "map" ? h("a", { class: "chip chip-link " + s.k, href: it.url, target: "_blank", rel: "noopener noreferrer" }, linkLabel) : null,
     h("a", { class: "chip chip-map", href: mapsUrl(it), target: "_blank", rel: "noopener noreferrer" }, "📍 Google 地圖"),
-    it.stay ? h("span", { class: "chip chip-stay" }, "⏱ 停留 " + it.stay) : null);
+    it.stay ? h("span", { class: "chip chip-stay" }, "⏱ 停留 " + it.stay) : null,
+    !it.memo ? h("button", { class: "chip chip-stay", type: "button", onclick: () => openEdit(it.id, "eMemo") }, "📝 寫筆記") : null);
+  const memoLines = (it.memo || "").split(/\n+/).map(x => x.replace(/^[-•・*\s]+/, "").trim()).filter(Boolean);
+  const memo = memoLines.length ? h("div", { class: "memo" }, h("div", { class: "memo-h" }, "📝 到這裡要做的事"),
+    h("ul", {}, ...memoLines.map(x => h("li", {}, x)))) : null;
   const meta = it.added_by ? h("div", { class: "meta" }, `${it.added_by} 加的`) : null;
   /* 側邊縮圖：有照片放照片；只有影片連結時放一個可點的播放圖示 */
   const thumbInner = it.photo ? h("img", { src: photoUrl(it.photo), alt: "", loading: "lazy" })
@@ -337,7 +345,8 @@ function itemEl(it, i, list, draft) {
     h("button", { class: "ic", type: "button", "aria-label": "編輯", "aria-expanded": openId === it.id ? "true" : "false", onclick: () => { openId = openId === it.id ? null : it.id; confirmId = null; render(); } }, "✎"));
   const li = h("li", { class: "item" + (thumb ? " has-thumb" : "") + (it.photo ? " has-photo" : "") },
     h("div", { class: "body" }, thumb,
-      h("div", { class: "main" }, ttl, it.note ? h("div", { class: "note" }, it.note) : null, chips, meta), acts));
+      h("div", { class: "main" }, ttl, it.note ? h("div", { class: "note" }, it.note) : null, chips, meta), acts),
+    memo);
   if (openId === it.id) li.append(editEl(it, draft || it));
   return li;
 }
@@ -350,6 +359,7 @@ function editEl(it, v) {
       h("div", { class: "field" }, h("label", { for: "eTime-" + id }, "時間（選填）"), h("input", { type: "text", class: "eTime", id: "eTime-" + id, value: v.time || "", placeholder: "例如 18:00、傍晚", maxlength: "40" }))),
     h("div", { class: "field" }, h("label", { for: "eStay-" + id }, "預計停留多久（選填）"), h("input", { type: "text", class: "eStay", id: "eStay-" + id, value: v.stay || "", placeholder: "例如 1 小時、半天", maxlength: "40" })),
     h("div", { class: "field" }, h("label", { for: "eUrl-" + id }, "連結"), h("input", { type: "text", class: "eUrl", id: "eUrl-" + id, value: v.url || "", inputmode: "url" })),
+    h("div", { class: "field" }, h("label", { for: "eMemo-" + id }, "📝 筆記：到這裡要做什麼（一行一件事）"), h("textarea", { class: "eMemo", id: "eMemo-" + id, rows: "3", maxlength: "4000" }, v.memo || "")),
     h("div", { class: "field" }, h("label", { for: "eNote-" + id }, "備註"), h("textarea", { class: "eNote", id: "eNote-" + id, rows: "2", maxlength: "2000" }, v.note || "")),
     h("div", { class: "field" }, h("label", { for: "eDay-" + id }, "排到哪天"), sel),
     h("div", { class: "btns" },
@@ -379,7 +389,7 @@ function swap(a, b) {
 function saveEdit(it, e) {
   const url = cleanUrl(e.querySelector(".eUrl").value), day = e.querySelector(".eDay").value;
   const patch = { id: it.id, title: e.querySelector(".eTitle").value.trim() || source(url).label, url,
-    time: e.querySelector(".eTime").value.trim(), stay: e.querySelector(".eStay").value.trim(), note: e.querySelector(".eNote").value.trim(), day };
+    time: e.querySelector(".eTime").value.trim(), stay: e.querySelector(".eStay").value.trim(), memo: e.querySelector(".eMemo").value.trim(), note: e.querySelector(".eNote").value.trim(), day };
   if (day !== (it.day || "")) patch.sort = Date.now();
   run(async () => { await rpc("trip_save", { p: pass, it: patch }); openId = null; toast(day !== (it.day || "") ? "已移到" + dayLabel(day) : "已儲存"); });
 }
@@ -400,7 +410,7 @@ function aiShow(kind, ...kids) { const b = $("#fAiBox"); b.className = "aibox " 
 async function aiRun() {
   if (aiBusy) return;
   const url = cleanUrl($("#fUrl").value), hint = $("#fTitle").value.trim();
-  if (!isHttp(url) && !hint) { aiShow("warn", "先貼一個連結，或在「這是哪裡」寫個名稱，AI 才能判斷。"); return; }
+  if (!isHttp(url) && !hint) { aiShow("warn", "先貼一個連結，或在「地點名字」寫個名稱，AI 才能判斷。"); return; }
   aiBusy = true; $("#fAi").disabled = true; aiShow("", "✨ AI 正在看這個連結，大約 5 秒…");
   try {
     const r = await fetch(`${BASE}/functions/v1/analyze`, { method: "POST", headers: headers({ "Content-Type": "application/json" }),
@@ -408,8 +418,8 @@ async function aiRun() {
     const j = await r.json().catch(() => ({}));
     if (r.status === 401 || j.error === "bad_passcode") { onErr({ code: "28P01", message: "bad_passcode" }); return; }
     if (j.error === "no_api_key") { aiShow("warn", "AI 還沒設定好（Supabase 裡還沒放 API 金鑰），先自己選日期吧。"); return; }
-    if (j.error === "nothing_to_read") { aiShow("warn", "IG 擋住了，讀不到這支影片的文字說明。在「這是哪裡」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
-    if (j.error === "not_identified") { aiShow("warn", "AI 看不出這是哪裡。在「這是哪裡」寫得更具體一點（例如英文店名或所在區域），再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
+    if (j.error === "nothing_to_read") { aiShow("warn", "IG 擋住了，讀不到這支影片的文字說明。在「地點名字」寫個店名或關鍵字，再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
+    if (j.error === "not_identified") { aiShow("warn", "AI 看不出這是哪裡。在「地點名字」寫得更具體一點（例如英文店名或所在區域），再按一次 ✨ AI 判斷。"); $("#fTitle").focus(); return; }
     if (!j.ok) { aiShow("warn", "AI 暫時沒回應，可以稍後再試，或自己選日期。"); return; }
     /* 直接排進行程：AI 的判斷優先，你自己有填的時間、停留、備註會保留 */
     const place = [j.place, j.area && !String(j.place).includes(j.area) ? j.area : ""].filter(Boolean).join("，");
@@ -419,8 +429,8 @@ async function aiRun() {
     const saved = await rpc("trip_save", { p: pass, it: {
       title: place || hint || source(url).label + " 收藏", url: isHttp(url) ? url : "",
       note: mine("#fNote") || j.note || "", day: j.day || "", time: mine("#fTime") || j.time || "",
-      stay: mine("#fStay") || j.stay || "", sort: Date.now(), photo, added_by: me } });
-    ["#fUrl", "#fTitle", "#fNote", "#fTime", "#fStay"].forEach(k => $(k).value = "");
+      stay: mine("#fStay") || j.stay || "", memo: mine("#fMemo"), sort: Date.now(), photo, added_by: me } });
+    ["#fUrl", "#fTitle", "#fNote", "#fTime", "#fStay", "#fMemo"].forEach(k => $(k).value = "");
     $("#fUrl").dispatchEvent(new Event("input")); $("#fPhotoClear").click(); $("#fDay").value = "";
     await refresh(); render();
     const where = j.day ? `排進 ${dayLabel(j.day)}${j.time ? " " + j.time : ""}` : "沒找到適合的日子，先放進想去清單";
@@ -446,6 +456,7 @@ function initForm() {
   fUrl.addEventListener("input", updTag);
   fUrl.addEventListener("paste", () => setTimeout(() => { fUrl.value = cleanUrl(fUrl.value); updTag(); if (isHttp(fUrl.value)) aiRun(); else $("#fTitle").focus(); }, 0));
   $("#fAi").addEventListener("click", aiRun);
+  $("#fTitle").addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); aiRun(); } });
   const clearPhoto = () => { pendingPhoto = null; $("#fPhoto").value = ""; $("#fPreview").hidden = true; const im = $("#fPreviewImg"); if (im.src) URL.revokeObjectURL(im.src); im.removeAttribute("src"); };
   $("#fPhoto").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (!f) return; pendingPhoto = f; $("#fPreviewImg").src = URL.createObjectURL(f); $("#fPreview").hidden = false; });
   $("#fPhotoClear").addEventListener("click", clearPhoto);
@@ -456,8 +467,8 @@ function initForm() {
     $("#fMsg").textContent = pendingPhoto ? "照片上傳中…" : ""; $("#fBtn").disabled = true;
     run(async () => {
       const photo = pendingPhoto ? await uploadPhoto(pendingPhoto) : "";
-      await rpc("trip_save", { p: pass, it: { title: title || source(url).label + " 收藏", url, note, day, time: $("#fTime").value.trim(), stay: $("#fStay").value.trim(), sort: Date.now(), photo, added_by: me } });
-      fUrl.value = ""; $("#fTitle").value = ""; $("#fNote").value = ""; $("#fTime").value = ""; $("#fStay").value = ""; $("#fAiBox").hidden = true; aiFilled = {}; updTag(); clearPhoto();
+      await rpc("trip_save", { p: pass, it: { title: title || source(url).label + " 收藏", url, note, day, time: $("#fTime").value.trim(), stay: $("#fStay").value.trim(), memo: $("#fMemo").value.trim(), sort: Date.now(), photo, added_by: me } });
+      fUrl.value = ""; $("#fTitle").value = ""; $("#fNote").value = ""; $("#fTime").value = ""; $("#fStay").value = ""; $("#fMemo").value = ""; $("#fAiBox").hidden = true; aiFilled = {}; updTag(); clearPhoto();
       toast("已加到" + dayLabel(day));
     }).finally(() => { $("#fBtn").disabled = false; $("#fMsg").textContent = ""; });
   });

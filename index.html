@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='10' width='56' height='44' rx='8' fill='%230E6B46' stroke='white' stroke-width='3'/%3E%3Cpath d='M18 40h28M32 22v18m-8-8 8-10 8 10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -47,31 +47,33 @@
 
   <form class="add" id="addForm" autocomplete="off">
     <h2>看到不錯的地方？貼上來</h2>
-    <p class="hint">IG Reels、TikTok、YouTube、Google 地圖、小紅書都可以。貼上連結後，AI 會判斷地點、停留多久，直接排進適合的那天。排錯了可以按「復原」或自己改。</p>
+    <p class="hint">有 IG Reels、TikTok、Google 地圖連結就貼上；只知道大概名字也可以，寫在「地點名字」。按 ✨ AI 判斷，它會找出正確地點、停留多久，直接排進適合的那天。</p>
     <div class="field">
-      <label for="fUrl">連結</label>
-      <div class="urlrow">
-        <div class="urlbox"><input type="text" id="fUrl" inputmode="url" placeholder="https://www.instagram.com/reel/…"><span class="tag" id="fTag" hidden></span></div>
-        <button class="btn ai" type="button" id="fAi">✨ AI 判斷</button>
-      </div>
+      <label for="fUrl">連結（選填）</label>
+      <div class="urlbox"><input type="text" id="fUrl" inputmode="url" placeholder="https://www.instagram.com/reel/…"><span class="tag" id="fTag" hidden></span></div>
     </div>
+    <div class="field"><label for="fTitle">地點名字（只知道大概也可以）</label><input type="text" id="fTitle" maxlength="200" placeholder="例如：聖塔莫尼卡那家很紅的潛艇堡"></div>
+    <div class="field"><label for="fMemo">📝 筆記：到這裡要做什麼（選填）</label><textarea id="fMemo" rows="2" maxlength="4000" placeholder="一行一件事，例如：&#10;點招牌 Godmother 潛艇堡&#10;買伴手禮給阿嬤"></textarea></div>
+    <div class="photo-pick">
+      <label class="pick" for="fPhoto"><span class="pick-ic" aria-hidden="true">＋</span><span>加照片（Reels 截圖也可以）</span></label>
+      <input type="file" id="fPhoto" accept="image/*" class="sr">
+      <div class="preview" id="fPreview" hidden><img alt="" id="fPreviewImg"><button type="button" class="ic" id="fPhotoClear" aria-label="移除照片">✕</button></div>
+    </div>
+    <button class="btn ai wide" type="button" id="fAi">✨ AI 判斷並排進行程</button>
     <div class="aibox" id="fAiBox" role="status" hidden></div>
-    <div class="field"><label for="fTitle">這是哪裡／做什麼</label><input type="text" id="fTitle" maxlength="200" placeholder="例如：Santa Monica 的早午餐店"></div>
+    <details class="manual" id="fManual">
+      <summary>或自己選日期、時間</summary>
     <div class="row2">
       <div class="field"><label for="fDay">排到哪天</label><select id="fDay"></select></div>
       <div class="field"><label for="fTime">時間（選填）</label><input type="text" id="fTime" maxlength="40" placeholder="例如 18:00、傍晚"></div>
     </div>
     <div class="field"><label for="fStay">預計停留多久（選填）</label><input type="text" id="fStay" maxlength="40" placeholder="例如 1 小時、半天，空著就讓 AI 建議"></div>
     <div class="field"><label for="fNote">備註（選填）</label><input type="text" id="fNote" maxlength="2000" placeholder="例如：要預約、只開到下午 3 點"></div>
-    <div class="photo-pick">
-      <label class="pick" for="fPhoto"><span class="pick-ic" aria-hidden="true">＋</span><span>加照片（Reels 截圖也可以）</span></label>
-      <input type="file" id="fPhoto" accept="image/*" class="sr">
-      <div class="preview" id="fPreview" hidden><img alt="" id="fPreviewImg"><button type="button" class="ic" id="fPhotoClear" aria-label="移除照片">✕</button></div>
-    </div>
     <div class="actions">
-      <button class="btn" type="submit" id="fBtn">加進行程</button>
+      <button class="btn ghost" type="submit" id="fBtn">照我選的加進行程</button>
       <span class="hint" id="fMsg" role="status"></span>
     </div>
+    </details>
   </form>
 
   <nav class="nav" id="nav" aria-label="跳到某一天"></nav>
@@ -109,6 +111,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="config.js"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

@@ -74,6 +74,14 @@ textarea{resize:vertical;min-height:44px}
 .urlrow{display:flex;gap:8px;align-items:stretch}
 .urlrow .urlbox{flex:1;min-width:0}
 .btn.ai{flex:none;background:var(--ink);color:var(--bg);white-space:nowrap}
+.btn.wide{width:100%;padding:13px}
+.manual{border-top:1px dashed var(--line);padding-top:10px}
+.manual>summary{cursor:pointer;color:var(--muted);font-size:13.5px;padding:4px 0}
+.manual[open]{display:flex;flex-direction:column;gap:12px}
+.memo{background:var(--amber-soft);border-radius:9px;padding:8px 12px;font-size:13.5px;margin:0 10px 10px}
+.memo-h{font-size:12px;font-weight:700;color:var(--amber-ink);margin-bottom:2px}
+.memo ul{margin:0;padding-left:18px}
+.memo li{word-break:break-word}
 .aibox{font-size:13.5px;border-radius:10px;padding:10px 12px;background:var(--soft);line-height:1.5}
 .aibox.ok{background:color-mix(in srgb,var(--sign) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--sign) 35%,transparent)}
 .aibox.warn{background:var(--amber-soft)}
