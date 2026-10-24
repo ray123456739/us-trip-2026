@@ -293,11 +293,34 @@ $("#logout").addEventListener("click", logout);
 let started = false;
 async function start() {
   $("#app").hidden = false;
+  $("#nameBar").hidden = !!me;
   if (!started) { started = true; buildShell(); initForm(); setInterval(poll, 20000); document.addEventListener("visibilitychange", poll); }
   try { await refresh(); render(); } catch (e) { onErr(e); }
 }
 
+/* 第一次用一鍵連結進來的人，請他留個名字 */
+$("#nameForm").addEventListener("submit", ev => {
+  ev.preventDefault(); const n = $("#nName").value.trim(); if (!n) return;
+  me = n; store.set("trip.name", n); $("#nameBar").hidden = true; toast(`嗨 ${n}，之後你加的行程都會標上名字`);
+});
+
+/* 一鍵登入：網址帶 #k=密碼 就自動登入，登入後把密碼從網址拿掉 */
+function readLinkKey() {
+  const m = location.hash.match(/(?:^#|&)k=([^&]+)/);
+  if (!m) return "";
+  try { history.replaceState(null, "", location.pathname + location.search); } catch {}
+  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+}
+
 /* ---------- 開始 ---------- */
-if (!BASE || !CFG.key) $("#setup").hidden = false;
-else if (pass) start();
-else showGate();
+(async () => {
+  if (!BASE || !CFG.key) { $("#setup").hidden = false; return; }
+  const k = readLinkKey();
+  if (k && k !== pass) {
+    try {
+      if (await rpc("trip_login", { p: k })) { pass = k; store.set("trip.pass", k); }
+      else { showGate(); $("#gErr").textContent = "這個連結的密碼已經換過了，請輸入新的旅行密碼。"; return; }
+    } catch { showGate(); $("#gErr").textContent = "連不上，請確認網路後再試。"; return; }
+  }
+  if (pass) start(); else showGate();
+})();

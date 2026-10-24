@@ -56,6 +56,11 @@ button,input,select,textarea{font:inherit;color:inherit}
 .route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:14px}
 .route .arr{color:var(--muted);font-family:var(--mono)}
 
+.namebar{background:var(--amber-soft);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.namebar label{font-size:14px;font-weight:700}
+.namebar-row{display:flex;gap:8px}
+.namebar-row input{flex:1}
+
 /* forms */
 .add{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
 .add h2{font-family:var(--display);font-size:18px;font-weight:800;margin:0}
