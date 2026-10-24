@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='10' width='56' height='44' rx='8' fill='%230E6B46' stroke='white' stroke-width='3'/%3E%3Cpath d='M18 40h28M32 22v18m-8-8 8-10 8 10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -22,7 +22,7 @@
     <p class="muted">11/20 – 12/05 · 輸入旅行密碼就能一起排行程</p>
     <form id="gateForm" class="stack" autocomplete="off">
       <div class="field"><label for="gPass">旅行密碼</label><input id="gPass" type="password" required autocomplete="current-password"></div>
-      <div class="field"><label for="gName">你是誰？（顯示誰加了什麼）</label><input id="gName" type="text" maxlength="20" placeholder="例如：Ray、堂姐"></div>
+      <div class="field"><label for="gName">你是誰？（顯示誰加了什麼）</label><input id="gName" type="text" maxlength="20" placeholder="例如：Ray、Irene"></div>
       <button class="btn" id="gBtn" type="submit">進入旅行書</button>
       <p class="err" id="gErr" role="alert"></p>
     </form>
@@ -42,7 +42,7 @@
 
   <form class="namebar" id="nameBar" autocomplete="off" hidden>
     <label for="nName">你是誰？加行程時會標上名字</label>
-    <div class="namebar-row"><input type="text" id="nName" maxlength="20" placeholder="例如：堂姐"><button class="btn sm" type="submit">好</button></div>
+    <div class="namebar-row"><input type="text" id="nName" maxlength="20" placeholder="例如：Irene"><button class="btn sm" type="submit">好</button></div>
   </form>
 
   <form class="add" id="addForm" autocomplete="off">
@@ -90,6 +90,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="config.js"></script>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>
