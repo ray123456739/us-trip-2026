@@ -85,7 +85,7 @@ function compress(file) {
 
 /* ---------- 狀態 ---------- */
 let pass = store.get("trip.pass"), me = store.get("trip.name");
-let items = [], covers = {}, loaded = false, openId = null, confirmId = null, busy = false;
+let items = [], questions = [], covers = {}, loaded = false, openId = null, confirmId = null, busy = false;
 
 /* ---------- 連結判斷 ---------- */
 function cleanUrl(raw) {
@@ -136,7 +136,7 @@ async function run(fn) {
 /* ---------- 讀取 ---------- */
 async function refresh() {
   const data = await rpc("trip_list", { p: pass });
-  items = data.items || []; covers = {}; for (const c of data.covers || []) covers[c.day] = c.photo;
+  items = data.items || []; questions = data.questions || []; covers = {}; for (const c of data.covers || []) covers[c.day] = c.photo;
   loaded = true;
 }
 async function poll() {
@@ -150,7 +150,7 @@ function buildShell() {
   $("#count").textContent = now < start ? `還有 ${Math.ceil((start - now) / 864e5)} 天出發，BR008 早上 6:40 落地 SFO。`
     : now < end ? `旅程第 ${Math.floor((now - start) / 864e5) + 1} 天，玩得開心！` : "旅程結束了，歡迎回家。";
   dayOptions($("#fDay"), "");
-  $("#nav").replaceChildren(h("a", { href: "#wish", class: "wish" }, "想去清單"),
+  $("#nav").replaceChildren(h("a", { href: "#wish", class: "wish" }, "想去清單"), h("a", { href: "#qa", class: "qa-chip" }, "💬 問題"),
     ...DAYS.map(d => h("a", { href: "#d" + d.key.replaceAll("-", "") }, h("span", { class: "dot", style: `background:var(--${d.city})` }), d.md)));
   $("#days").replaceChildren(...DAYS.map(d => {
     const sub = [`住 ${d.stay}`]; if (SPECIAL[d.key]) sub.unshift(SPECIAL[d.key]);
@@ -178,7 +178,64 @@ function render() {
     fill($("#list-" + d.key), sorted(d.key), "這天還空著。", draft, true);
     renderCover(d);
   }
+  renderQA();
   loadLegs();
+}
+
+/* ---------- 問題討論 ---------- */
+const thinking = new Set();  // 正在等 AI 回答的問題
+let qaConfirm = null;
+const ago = t => { const m = Math.round((Date.now() - new Date(t)) / 60000);
+  return m < 1 ? "剛剛" : m < 60 ? `${m} 分鐘前` : m < 1440 ? `${Math.round(m / 60)} 小時前` : `${Math.round(m / 1440)} 天前`; };
+function renderQA() {
+  const list = $("#qaList");
+  const drafts = {}; list.querySelectorAll("input[data-qid]").forEach(i => { if (i.value) drafts[i.dataset.qid] = i.value; });
+  const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.qid : null;
+  if (!questions.length) { list.replaceChildren(h("li", { class: "empty" }, "還沒有人發問。")); return; }
+  list.replaceChildren(...questions.map(q => {
+    const inp = h("input", { type: "text", maxlength: "4000", placeholder: "回答或補充…", "data-qid": q.id, id: "qr-" + q.id, "aria-label": "回答這個問題" });
+    inp.value = drafts[q.id] || "";
+    const send = () => { const v = inp.value.trim(); if (!v) return;
+      run(async () => { await rpc("trip_reply", { p: pass, qid: q.id, body: v, who: me }); inp.value = ""; }); };
+    inp.addEventListener("keydown", e => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); send(); } });
+    const answers = (q.answers || []).map(a => h("div", { class: "ans" + (a.is_ai ? " ai" : "") },
+      h("div", { class: "ans-who" }, (a.is_ai ? "✨ AI 小幫手" : (a.answered_by || "有人")) + " · " + ago(a.created_at)),
+      h("div", { class: "ans-body" }, a.body)));
+    if (thinking.has(q.id)) answers.push(h("div", { class: "ans ai thinking" }, h("div", { class: "ans-who" }, "✨ AI 小幫手"), h("div", { class: "ans-body" }, "正在看你們的行程想答案…")));
+    return h("li", { class: "qa" },
+      h("div", { class: "qa-q" }, q.body),
+      h("div", { class: "qa-meta" }, `${q.asked_by || "有人"} 問 · ${ago(q.created_at)}`, h("span", { class: "spacer" }),
+        thinking.has(q.id) ? null : h("button", { class: "linkbtn sm", type: "button", onclick: () => askAI(q.id) }, "✨ 請 AI 再回答"),
+        qaConfirm === q.id
+          ? h("span", {}, "刪掉這題？", h("button", { class: "linkbtn sm", type: "button", onclick: () => run(async () => { await rpc("trip_qa_delete", { p: pass, qid: q.id, aid: null }); qaConfirm = null; toast("已刪除"); }) }, "刪除"),
+              h("button", { class: "linkbtn sm", type: "button", onclick: () => { qaConfirm = null; renderQA(); } }, "保留"))
+          : h("button", { class: "linkbtn sm", type: "button", onclick: () => { qaConfirm = q.id; renderQA(); } }, "刪除")),
+      ...answers,
+      h("div", { class: "qa-reply" }, inp, h("button", { class: "btn sm", type: "button", onclick: send }, "回覆")));
+  }));
+  if (focused) { const el = document.getElementById("qr-" + focused); if (el) el.focus(); }
+}
+async function askAI(qid) {
+  thinking.add(qid); renderQA();
+  try {
+    const r = await fetch(`${BASE}/functions/v1/ask`, { method: "POST", headers: headers({ "Content-Type": "application/json" }), body: JSON.stringify({ p: pass, qid }) });
+    const j = await r.json().catch(() => ({}));
+    if (j.error === "no_api_key") toast("AI 還沒設定好，先請家人回答吧");
+    else if (!j.ok) toast("AI 暫時沒回應，可以稍後按「請 AI 再回答」");
+  } catch { toast("連不上 AI，請確認網路"); }
+  finally { thinking.delete(qid); try { await refresh(); } catch {} render(); }
+}
+function initQA() {
+  $("#qaForm").addEventListener("submit", ev => {
+    ev.preventDefault(); const v = $("#qaBody").value.trim();
+    if (!v) { $("#qaMsg").textContent = "先寫下你的問題。"; return; }
+    $("#qaMsg").textContent = ""; $("#qaBtn").disabled = true;
+    run(async () => {
+      const q = await rpc("trip_ask", { p: pass, body: v, who: me });
+      $("#qaBody").value = ""; toast("問題已送出，AI 小幫手正在回答");
+      askAI(q.id);
+    }).finally(() => { $("#qaBtn").disabled = false; });
+  });
 }
 /* 封面：自己上傳的照片優先，沒有就用城市預設照片（Wikimedia Commons） */
 function renderCover(d) {
@@ -428,7 +485,7 @@ let started = false;
 async function start() {
   $("#app").hidden = false;
   $("#nameBar").hidden = !!me;
-  if (!started) { started = true; buildShell(); initForm(); setInterval(poll, 20000); document.addEventListener("visibilitychange", poll); }
+  if (!started) { started = true; buildShell(); initForm(); initQA(); setInterval(poll, 20000); document.addEventListener("visibilitychange", poll); }
   try { await refresh(); render(); } catch (e) { onErr(e); }
 }
 

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='4' y='10' width='56' height='44' rx='8' fill='%230E6B46' stroke='white' stroke-width='3'/%3E%3Cpath d='M18 40h28M32 22v18m-8-8 8-10 8 10' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 </head>
 <body>
@@ -84,6 +84,19 @@
     <ul class="wishlist" id="list-wish"><li class="empty">正在載入行程…</li></ul>
   </section>
 
+  <section class="sec" id="qa">
+    <div class="sec-head">
+      <div class="sign exit qasign"><span class="md">Q&amp;A</span><span class="wd">ASK</span></div>
+      <div class="sec-title"><h3>問題討論</h3><span class="sub">對行程有疑問就問，大家可以回答，AI 小幫手也會先根據行程回覆</span></div>
+    </div>
+    <form class="qa-ask" id="qaForm" autocomplete="off">
+      <label for="qaBody" class="sr">你的問題</label>
+      <textarea id="qaBody" rows="2" maxlength="2000" placeholder="例如：11/24 幾點從 LA 出發比較不會塞車？"></textarea>
+      <div class="actions"><button class="btn" type="submit" id="qaBtn">發問</button><span class="hint" id="qaMsg" role="status"></span></div>
+    </form>
+    <ul class="qa-list" id="qaList"><li class="empty">還沒有人發問。</li></ul>
+  </section>
+
   <div id="days" class="days"></div>
 
   <footer class="foot">
@@ -96,6 +109,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
 <script src="config.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
