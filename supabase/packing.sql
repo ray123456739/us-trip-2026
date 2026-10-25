@@ -36,7 +36,7 @@ begin
       title  = coalesce(left(it->>'title',200), title),
       cat    = coalesce(left(it->>'cat',20), cat),
       who    = coalesce(left(it->>'who',20), who),
-      qty    = coalesce(greatest(1, least(99, (it->>'qty')::int)), qty),
+      qty    = case when coalesce(it->>'qty','') <> '' then greatest(1, least(99, (it->>'qty')::int)) else qty end,
       note   = coalesce(left(it->>'note',1000), note),
       buy    = coalesce((it->>'buy')::boolean, buy),
       packed = coalesce((it->>'packed')::boolean, packed),

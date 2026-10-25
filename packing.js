@@ -146,7 +146,6 @@ function itemEl(it) {
   if (it.qty > 1) meta.push(h("span", {}, `× ${it.qty}`));
   if (it.buy) meta.push(h("span", { class: "pk-badge buy" }, "要買"));
   if (it.note) meta.push(h("span", {}, it.note));
-  if (mode === "back" && !it.packed) meta.push(h("span", {}, "（出發時沒勾）"));
   const li = h("li", { class: "pk-it" + (ok ? " ok" : "") },
     h("div", { class: "pk-row" },
       h("button", { class: "pk-check", type: "button", "aria-pressed": ok, "aria-label": (ok ? "取消勾選 " : "勾選 ") + it.title, onclick: () => toggle(it) }, ok ? "✓" : ""),
