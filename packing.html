@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#138DA0">
+<meta name="robots" content="noindex,nofollow">
+<title>美西行李清單</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800;900&family=Overpass+Mono:wght@500;700&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="packing.css?v=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='10' y='16' width='44' height='40' rx='8' fill='%23138DA0' stroke='white' stroke-width='3'/%3E%3Cpath d='M24 16v-6h16v6M22 36l7 7 13-14' stroke='white' stroke-width='5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<main id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="sign big pk-sign">PACKING LIST</div>
+    <h1>美西行李清單</h1>
+    <p class="muted">跟旅遊書同一個旅行密碼</p>
+    <form id="gateForm" class="stack" autocomplete="off">
+      <div class="field"><label for="gPass">旅行密碼</label><input id="gPass" type="password" required autocomplete="current-password"></div>
+      <div class="field"><label for="gName">你是誰？</label><input id="gName" type="text" maxlength="20" placeholder="例如：Ray、Irene"></div>
+      <button class="btn" id="gBtn" type="submit">打開行李清單</button>
+      <p class="err" id="gErr" role="alert"></p>
+    </form>
+  </div>
+</main>
+
+<div id="app" class="wrap" hidden>
+  <header class="hero pk-hero">
+    <div class="eyebrow" id="eyebrow">11/20 出發 · 16 天</div>
+    <h1>美西行李清單</h1>
+    <p class="count" id="count"></p>
+    <div class="pk-meter" aria-hidden="true"><span id="meterBar"></span></div>
+    <a class="pk-back" href="./">← 回旅遊書</a>
+  </header>
+
+  <div class="pk-mode" role="tablist" aria-label="清單模式">
+    <button type="button" role="tab" data-mode="packed" class="on">🧳 出發前打包</button>
+    <button type="button" role="tab" data-mode="back">🏨 回程收行李</button>
+  </div>
+  <p class="hint" id="modeHint"></p>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <h2>還要帶什麼？</h2>
+    <div class="field"><label for="aTitle">東西名字</label><input type="text" id="aTitle" maxlength="200" placeholder="例如：護照、行動電源、迪士尼髮箍" required></div>
+    <div class="row2">
+      <div class="field"><label for="aCat">分類</label><select id="aCat"></select></div>
+      <div class="field"><label for="aQty">數量</label><input type="number" id="aQty" min="1" max="99" value="1" inputmode="numeric"></div>
+    </div>
+    <div class="field"><span class="lbl">誰帶</span><div class="pk-who" id="aWho"></div></div>
+    <div class="field"><label for="aNote">備註（選填）</label><input type="text" id="aNote" maxlength="1000" placeholder="例如：隨身不能托運、放外套口袋"></div>
+    <label class="pk-toggle"><input type="checkbox" id="aBuy"> 出發前還要買</label>
+    <div class="actions"><button class="btn" type="submit" id="aBtn">加進清單</button><span class="hint" id="aMsg" role="status"></span></div>
+  </form>
+
+  <section class="pk-suggest" id="suggest">
+    <div><b>不知道從哪開始？</b><span class="hint">一鍵加入美西 16 天自駕的常用清單（11 月早晚冷、賭城乾燥、迪士尼一整天），已經有的不會重複加。</span></div>
+    <button class="btn ai" type="button" id="sugBtn">✨ 加入建議清單</button>
+  </section>
+
+  <nav class="nav pk-filter" id="filter" aria-label="篩選"></nav>
+
+  <div id="groups" class="pk-groups"><p class="empty">正在載入清單…</p></div>
+
+  <footer class="foot">
+    <span>兩個人看到的是同一份，每 20 秒自動更新。</span>
+    <button class="linkbtn" type="button" id="resetBtn">全部取消勾選</button>
+    <button class="linkbtn" type="button" id="logout">登出這支手機</button>
+  </footer>
+</div>
+
+<div id="setup" class="gate" hidden><div class="gate-card"><h1>資料庫還沒準備好</h1><p class="muted" id="setupMsg">Supabase 裡還沒有行李清單的資料表。到 SQL Editor 執行 repo 裡的 <code>supabase/packing.sql</code> 一次就好。</p></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="config.js"></script>
+<script src="packing.js?v=1"></script>
+</body>
+</html>

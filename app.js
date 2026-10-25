@@ -150,7 +150,7 @@ function buildShell() {
   $("#count").textContent = now < start ? `還有 ${Math.ceil((start - now) / 864e5)} 天出發，BR008 早上 6:40 落地 SFO。`
     : now < end ? `旅程第 ${Math.floor((now - start) / 864e5) + 1} 天，玩得開心！` : "旅程結束了，歡迎回家。";
   dayOptions($("#fDay"), "");
-  $("#nav").replaceChildren(h("a", { href: "#wish", class: "wish" }, "想去清單"), h("a", { href: "#qa", class: "qa-chip" }, "💬 問題"),
+  $("#nav").replaceChildren(h("a", { href: "#wish", class: "wish" }, "想去清單"), h("a", { href: "#qa", class: "qa-chip" }, "💬 問題"), h("a", { href: "packing.html", class: "qa-chip" }, "🧳 行李"),
     ...DAYS.map(d => h("a", { href: "#d" + d.key.replaceAll("-", "") }, h("span", { class: "dot", style: `background:var(--${d.city})` }), d.md)));
   $("#days").replaceChildren(...DAYS.map(d => {
     const sub = [`住 ${d.stay}`]; if (SPECIAL[d.key]) sub.unshift(SPECIAL[d.key]);
